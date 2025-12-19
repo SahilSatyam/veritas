@@ -98,7 +98,7 @@ export default function Home() {
           <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>Day Index Preview</h2>
           <div>
             <button className={styles.btnSecondary}>Start at Day 1</button>
-            <Link href="/index"><button className={styles.btnPrimary}>Browse all 100 days</button></Link>
+            <Link href="/days"><button className={styles.btnPrimary}>Browse all 100 days</button></Link>
           </div>
         </div>
 

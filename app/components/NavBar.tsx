@@ -19,7 +19,7 @@ export default function NavBar() {
 
         <div className={styles.links}>
           <Link href="/" className={`${styles.link} ${isActive("/")}`}>Overview</Link>
-          <Link href="/index" className={`${styles.link} ${isActive("/index")}`}>Day Index</Link>
+          <Link href="/days" className={`${styles.link} ${isActive("/days")}`}>Day Index</Link>
           <Link href="/about" className={`${styles.link} ${isActive("/about")}`}>About</Link>
           
 
