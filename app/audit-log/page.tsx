@@ -11,7 +11,7 @@ export default function AuditLogPage() {
         <h1 className={styles.title} style={{ marginBottom: "2rem", marginTop: "1rem" }}>Audit Log</h1>
         <div className={styles.prose}>
           <p>
-            The intent of this project is to be an "open book" of its own construction. 
+            The intent of this project is to be an &quot;open book&quot; of its own construction. 
             Below is a record of major architectural decisions and content updates.
           </p>
           
@@ -21,7 +21,7 @@ export default function AuditLogPage() {
                 <AlertCircle size={16} /> Latest Event: System Initialization
               </div>
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                Dec 19, 2024: Repository initialized with "Sanctity of the Environment" module. 
+                Dec 19, 2024: Repository initialized with &quot;Sanctity of the Environment&quot; module. 
                 Focus on reproducibility and supply chain security.
               </p>
             </div>

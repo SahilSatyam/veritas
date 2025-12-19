@@ -11,7 +11,7 @@ export interface DayData {
   day: string;
   tags: string[];
   content: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export async function getDayData(id: string): Promise<DayData> {

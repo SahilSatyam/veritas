@@ -15,7 +15,7 @@ export default function MethodologyPage() {
             software practices.
           </p>
           <p>
-            Each "Day" in this series represents a concrete step towards a more robust AI system. We borrow heavily from:
+            Each &quot;Day&quot; in this series represents a concrete step towards a more robust AI system. We borrow heavily from:
           </p>
           <ul>
             <li><strong>Software Engineering Reliability</strong> (SRE, DevOps)</li>
