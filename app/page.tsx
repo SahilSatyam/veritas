@@ -1,65 +1,156 @@
-import Image from "next/image";
+"use client";
+
+import styles from "./page.module.css";
+import { GitBranch, ShieldCheck, Scale, Server } from "lucide-react";
+import Link from "next/link";
+import Tilt from "react-parallax-tilt";
+import LensTag from "./components/LensTag";
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="container">
+      {/* Hero Section */}
+      <section className={styles.hero}>
+        <div className={styles.heroLeft}>
+          <h1 className={styles.heroTitle}>
+            100 Days of Responsible AI Engineering
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className={styles.heroSubtitle}>
+            A definitive technical series for high-intent practitioners. 
+            Production-grade rigor, zero hype.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className={styles.heroRight}>
+          <div className={styles.heroMeta}>
+            <div className={styles.heroMetaTitle}>This is a system, not a blog.</div>
+            <p className={styles.heroMetaText}>
+              We explore the engineering reality of deploying AI responsibly—focusing on auditability, 
+              failure modes, and long-term maintenance.
+            </p>
+            <p className={styles.heroMetaText}>
+              Written for senior engineers who need defensible patterns.
+            </p>
+          </div>
         </div>
-      </main>
+      </section>
+
+      {/* Pillars Section */}
+      <div className={styles.pillarsContainer}>
+        <section className={styles.pillars}>
+          <Tilt>
+            <div className={styles.pillarCard}>
+              <div className={styles.iconBox}><GitBranch size={24} /></div>
+              <h3 className={styles.pillarTitle}>Reproducibility</h3>
+              <p className={styles.pillarDesc}>
+                Deterministic pipelines and versioned artifacts for complete system traceability.
+              </p>
+            </div>
+          </Tilt>
+          <Tilt>
+            <div className={styles.pillarCard}>
+              <div className={styles.iconBox}><ShieldCheck size={24} /></div>
+              <h3 className={styles.pillarTitle}>Safety</h3>
+              <p className={styles.pillarDesc}>
+                Runtime guardrails and adversarial testing aimed at failure prevention.
+              </p>
+            </div>
+          </Tilt>
+          <Tilt>
+            <div className={styles.pillarCard}>
+              <div className={styles.iconBox}><Scale size={24} /></div>
+              <h3 className={styles.pillarTitle}>Governance</h3>
+              <p className={styles.pillarDesc}>
+                Automated compliance checks and human-in-the-loop review protocols.
+              </p>
+            </div>
+          </Tilt>
+          <Tilt>
+            <div className={styles.pillarCard}>
+              <div className={styles.iconBox}><Server size={24} /></div>
+              <h3 className={styles.pillarTitle}>Production</h3>
+              <p className={styles.pillarDesc}>
+                Observability, scaling patterns, and realistic operational trade-offs.
+              </p>
+            </div>
+          </Tilt>
+        </section>
+      </div>
+
+      {/* Why This Exists */}
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>Why this exists</h2>
+        <div style={{ maxWidth: '600px' }}>
+          <p style={{ marginBottom: '1.5rem', color: 'var(--text-secondary)' }}>
+            Most AI discourse fluctuates between apocalyptic hype and marketing fluff. 
+            This series exists to ground the discipline in engineering first principles.
+          </p>
+          <ul className={styles.checkList}>
+            <li className={styles.checkItem}>For staff engineers needing architectural patterns.</li>
+            <li className={styles.checkItem}>To prevent silent failures in high-stakes deployments.</li>
+            <li className={styles.checkItem}>To create an auditable record of design decisions.</li>
+          </ul>
+        </div>
+      </section>
+
+      {/* Day Index Preview */}
+      <section className={styles.section}>
+        <div className={styles.previewHeader}>
+          <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>Day Index Preview</h2>
+          <div>
+            <button className={styles.btnSecondary}>Start at Day 1</button>
+            <Link href="/index"><button className={styles.btnPrimary}>Browse all 100 days</button></Link>
+          </div>
+        </div>
+
+        <table className={styles.previewTable}>
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th>Title</th>
+              <th>Failure Prevented</th>
+              <th>Lens</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="font-mono text-secondary">001</td>
+              <td>Defining the Operational Boundary</td>
+              <td>Scope Creep</td>
+              <td><LensTag>Governance</LensTag></td>
+            </tr>
+            <tr>
+              <td className="font-mono text-secondary">002</td>
+              <td>Data Lineage as a First-Class Citizen</td>
+              <td>Untraceable Model Bias</td>
+              <td><LensTag>Reproducibility</LensTag></td>
+            </tr>
+            <tr>
+              <td className="font-mono text-secondary">003</td>
+              <td>Structuring the Evaluation Harness</td>
+              <td>Regression on Edge Cases</td>
+              <td><LensTag>Safety</LensTag></td>
+            </tr>
+            <tr>
+              <td className="font-mono text-secondary">004</td>
+              <td>Secret Management in ML Pipelines</td>
+              <td>Credential Leakage</td>
+              <td><LensTag>Security</LensTag></td>
+            </tr>
+            <tr>
+              <td className="font-mono text-secondary">005</td>
+              <td>Model Versioning Strategies</td>
+              <td>Deployment Confusion</td>
+              <td><LensTag>Production</LensTag></td>
+            </tr>
+             <tr>
+              <td className="font-mono text-secondary">006</td>
+              <td>Automated Bias Detection Triggers</td>
+              <td>Discriminatory Output</td>
+              <td><LensTag>Safety</LensTag></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
     </div>
   );
 }

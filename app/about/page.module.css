@@ -1,0 +1,85 @@
+.section {
+  padding: 4rem 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.section:last-child {
+  border-bottom: none;
+}
+
+.header {
+  margin-bottom: 3rem;
+}
+
+.pageTitle {
+  font-size: 3.5rem;
+  font-family: var(--font-tanker);
+  margin-bottom: 2rem;
+  letter-spacing: 0.02em;
+  font-weight: 400;
+}
+
+.subHeading {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+  display: block;
+}
+
+.prose {
+  font-size: 1.125rem;
+  line-height: 1.7;
+  color: var(--text-primary);
+  max-width: 65ch;
+}
+
+.prose p {
+  margin-bottom: 1.5rem;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.card {
+  background: white;
+  padding: 1.5rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+
+.cardTitle {
+  font-family: var(--font-tanker);
+  font-weight: 400;
+  color: var(--accent-color);
+  margin-bottom: 0.75rem;
+  font-size: 1.25rem;
+  letter-spacing: 0.02em;
+}
+
+.cardText {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.authorBox {
+  background: var(--bg-secondary);
+  padding: 2rem;
+  border-radius: 4px;
+  margin-top: 2rem;
+}
+
+.authorTitle {
+  font-family: var(--font-tanker);
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
