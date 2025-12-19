@@ -97,7 +97,7 @@ export default function Home() {
         <div className={styles.previewHeader}>
           <h2 className={styles.sectionTitle} style={{ marginBottom: 0 }}>Day Index Preview</h2>
           <div>
-            <button className={styles.btnSecondary}>Start at Day 1</button>
+            <Link href="/day/001"><button className={styles.btnSecondary}>Start at Day 1</button></Link>
             <Link href="/days"><button className={styles.btnPrimary}>Browse all 100 days</button></Link>
           </div>
         </div>
@@ -114,27 +114,27 @@ export default function Home() {
           <tbody>
             <tr>
               <td className="font-mono text-secondary">001</td>
-              <td>Defining the Operational Boundary</td>
-              <td>Scope Creep</td>
-              <td><LensTag>Governance</LensTag></td>
+              <td>The Sanctity of the Environment</td>
+              <td>Dependency Hell</td>
+              <td><LensTag>Reproducibility</LensTag></td>
             </tr>
             <tr>
               <td className="font-mono text-secondary">002</td>
-              <td>Data Lineage as a First-Class Citizen</td>
-              <td>Untraceable Model Bias</td>
+              <td>Version Control for Data & Code</td>
+              <td>Silent Drift</td>
               <td><LensTag>Reproducibility</LensTag></td>
             </tr>
             <tr>
               <td className="font-mono text-secondary">003</td>
-              <td>Structuring the Evaluation Harness</td>
-              <td>Regression on Edge Cases</td>
-              <td><LensTag>Safety</LensTag></td>
+              <td>Containerization Basics (Docker)</td>
+              <td>Environment Skew</td>
+              <td><LensTag>Production</LensTag></td>
             </tr>
             <tr>
               <td className="font-mono text-secondary">004</td>
-              <td>Secret Management in ML Pipelines</td>
-              <td>Credential Leakage</td>
-              <td><LensTag>Security</LensTag></td>
+              <td>Unit Testing for Data Science</td>
+              <td>Silent Logic Failure</td>
+              <td><LensTag>Safety</LensTag></td>
             </tr>
             <tr>
               <td className="font-mono text-secondary">005</td>

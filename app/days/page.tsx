@@ -7,10 +7,10 @@ import { useState } from "react";
 import LensTag from "../components/LensTag";
 
 const days = [
-  { id: "001", title: "Defining the Operational Boundary", failure: "Scope Creep", lens: "Governance", domain: "MLOps", status: "done" },
-  { id: "002", title: "Data Lineage as a First-Class Citizen", failure: "Untraceable Model Bias", lens: "Reproducibility", domain: "Data Infra", status: "done" },
-  { id: "003", title: "Structuring the Evaluation Harness", failure: "Regression on Edge Cases", lens: "Safety", domain: "Evaluation", status: "done" },
-  { id: "004", title: "Secret Management in ML Pipelines", failure: "Credential Leakage", lens: "Security", domain: "Infra", status: "done" },
+  { id: "001", title: "The Sanctity of the Environment", failure: "Dependency Hell", lens: "Reproducibility", domain: "MLOps", status: "done" },
+  { id: "002", title: "Version Control for Data & Code", failure: "Silent Drift", lens: "Reproducibility", domain: "Data Infra", status: "done" },
+  { id: "003", title: "Containerization Basics (Docker)", failure: "Environment Skew", lens: "Production", domain: "Infra", status: "done" },
+  { id: "004", title: "Unit Testing for Data Science", failure: "Silent Logic Failure", lens: "Safety", domain: "QA", status: "done" },
   { id: "005", title: "Model Versioning Strategies", failure: "Deployment Confusion", lens: "Production", domain: "MLOps", status: "done" },
   { id: "006", title: "Automated Bias Detection Triggers", failure: "Discriminatory Output", lens: "Safety", domain: "Evaluation", status: "done" },
   { id: "007", title: "Infrastructure as Code for AI", failure: "Environment Drift", lens: "Reproducibility", domain: "Infra", status: "done" },

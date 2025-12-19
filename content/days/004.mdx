@@ -1,0 +1,226 @@
+---
+title: "Unit Testing for Data Science"
+subtitle: "Defensive Coding & Preventing Silent Failures"
+day: "004"
+tags: ["Production", "MLOps", "QA"]
+---
+
+## 1. Why This Topic Matters
+
+### The Failure Mode
+
+Your pricing model has been running in production for two weeks. Revenue is down 15%. You investigate and discover that due to a currency conversion bug, the model was treating "JPY" (Yen) input as "USD", causing it to recommend prices 100x too high. The code didn't crash. It didn't throw an error. It silently outputted garbage, and the system accepted it.
+
+### The Cause: "Happy Path" programming
+
+The data scientist wrote code that worked for the clean CSV on their laptop but failed to account for edge cases (nulls, zeros, wrong formats) in the real world.
+
+### The Leadership Reality
+
+- **The "Silent" Bug**: In traditional software, bugs often crash the app (SegFault). In AI, bugs often look like valid math. These are the hardest to detect and the most expensive to fix.
+- **Developer Burnout**: Without tests, every refactor is a high-stress event. "If I clean up this messy code, will I break the model?" This fear paralyzes teams and leads to "technical ossification."
+- **System-Wide Implication**: Trust is binary. If your system makes one "obviously stupid" error (like predicting a negative age), stakeholders will lose trust in the entire AI initiative.
+
+## 2. Core Concepts & Mental Models
+
+### The Testing Pyramid for AI
+
+We must adapt the standard software testing pyramid for ML:
+
+1.  **Unit Tests (The Foundation)**: Testing individual functions (e.g., "Does `clean_text` actually remove HTML tags?").
+2.  **Data Tests (The Guardrails)**: Validating input schemas (e.g., "Is `age` always positive?").
+3.  **Integration Tests**: The pipeline runs from start to finish.
+4.  **Model Evaluation**: (Not covered today) Is the accuracy acceptable?
+
+### Logic vs. Learned Behavior
+
+- **Test Logic (Deterministic)**: Feature engineering, data cleaning, API connectors. These must pass 100% of the time.
+- **Test Behavior (Probabilistic)**: The model prediction. We test properties, not exact values (e.g., "Probability sum must equal 1.0", not "Probability must be 0.85").
+
+## 3. Theoretical Foundations
+
+### Property-Based Testing
+
+Instead of testing $f(2) = 4$, we test the **properties** of the output.
+For a normalization function $f(x) = \frac{x - \mu}{\sigma}$:
+
+1.  **Property 1**: The mean of the output should be $\approx 0$.
+2.  **Property 2**: The standard deviation should be $\approx 1$.
+3.  **Property 3**: The shape of the input tensor must match the output tensor.
+
+## 4. Production-Grade Implementation
+
+### The Stack
+
+- **Framework**: `pytest` (Standard, powerful fixtures).
+- **Mocking**: `unittest.mock` (Standard library) to fake S3/Databases.
+- **Data Validation**: `pandera` (Optional but recommended) or defensive assertions.
+
+### Project Structure
+
+Do not hide tests in notebooks. They belong in a `tests/` directory mirroring your `src/`.
+
+```text
+my-ai-project/
+├── src/
+│   ├── data_cleaning.py
+│   └── model_utils.py
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py       # Fixtures (shared dummy data)
+│   ├── test_cleaning.py  # Tests for data_cleaning.py
+│   └── test_model.py
+```
+
+### The "Refactor-Fear" Cycle
+
+Without tests, you cannot refactor. Without refactoring, technical debt accumulates. Unit tests are the only mechanism that allows you to pay down technical debt safely.
+
+## 5. Hands-On Project: The "Defensive Preprocessor"
+
+**Objective**: Write a robust feature engineering function and a test suite that catches "dirty" data before it enters the model.
+
+**Constraints**:
+
+- Use `pytest`.
+- Create a test that fails intentionally on bad data.
+- Fix the code to handle the failure gracefully.
+
+### Step 1: The "Naive" Implementation (`src/preprocessing.py`)
+
+This is typical "notebook code" pasted into a script. It assumes perfect data.
+
+```python
+# src/preprocessing.py
+import pandas as pd
+
+def normalize_transactions(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normalizes transaction amounts and fills missing categories.
+    Assumption: 'amount' is in USD.
+    """
+    # DANGEROUS: Assumes 'amount' is never 0 or negative
+    df['log_amount'] = pd.np.log(df['amount'])
+
+    # DANGEROUS: Fills with string 'Unknown', might break downstream int-only models
+    df['category'] = df['category'].fillna('Unknown')
+
+    return df
+```
+
+### Step 2: The Test Suite (`tests/test_preprocessing.py`)
+
+We write a test that acts as a "Red Teamer," sending garbage data to the function.
+
+```python
+# tests/test_preprocessing.py
+import pytest
+import pandas as pd
+import numpy as np
+from src.preprocessing import normalize_transactions
+
+@pytest.fixture
+def dirty_data():
+    """Generates a dataframe with edge cases."""
+    return pd.DataFrame({
+        'id': [1, 2, 3, 4],
+        'amount': [100.0, -50.0, 0.0, np.nan],  # Negative, Zero, and Null
+        'category': ['food', None, 'transport', 'food']
+    })
+
+def test_normalize_transactions_robustness(dirty_data):
+    # This test expects the function to HANDLE bad data, not crash
+    # But our naive code will likely crash or produce -inf for log(0)
+
+    cleaned_df = normalize_transactions(dirty_data)
+
+    # Assertions based on "Responsibility"
+    # 1. No infinite values allowed (breaks training)
+    assert not np.isinf(cleaned_df['log_amount']).any(), "Found infinite values in log_amount"
+
+    # 2. No nulls allowed
+    assert not cleaned_df['log_amount'].isnull().any(), "Found nulls in log_amount"
+
+    # 3. Data Integrity
+    assert len(cleaned_df) == len(dirty_data), "Rows were dropped unexpectedly"
+```
+
+### Step 3: Run and Fail
+
+Run `pytest`.
+**Result**: FAILED.
+**Reason**: `RuntimeWarning: divide by zero encountered in log`. The assertion `not np.isinf` will fail because `log(0)` is `-inf`.
+
+### Step 4: Refactor for Robustness (The Fix)
+
+Update the source code to handle the reality of production data.
+
+```python
+# src/preprocessing.py
+import pandas as pd
+import numpy as np
+
+def normalize_transactions(df: pd.DataFrame) -> pd.DataFrame:
+    df = df.copy() # Good practice: don't mutate input
+
+    # 1. Handle Non-Positive Amounts
+    # Strategy: Clip to a small epsilon or drop?
+    # Decision: Drop invalid transactions as they are likely data errors.
+    valid_mask = df['amount'] > 0
+    df = df[valid_mask]
+
+    # 2. Safe Log Transform
+    df['log_amount'] = np.log(df['amount'])
+
+    # 3. Handle Missing Categories
+    df['category'] = df['category'].fillna('Unknown')
+
+    return df
+```
+
+**Note**: You must update your test expectation! If the strategy is to drop rows, the test `assert len(cleaned_df) == len(dirty_data)` will now fail. You must consciously decide: "Is dropping data correct?" If yes, update the test. This forces the trade-off discussion.
+
+## 6. Ethical, Security & Safety Considerations
+
+- **Input Validation as Security**: SQL Injection isn't the only threat. "Adversarial Examples" often rely on inputs that lie just outside standard distribution (e.g., massive pixel values). Strong schema validation prevents these inputs from even reaching the model.
+- **Bias detection in tests**: You can write a unit test that checks a "fairness constraint."
+  - Example: `assert result_for_group_A == result_for_group_B` for a known reference input.
+- **Human Factors**: Code that is untested causes stress. When an engineer knows `pytest` has their back, they code faster and happier.
+
+## 7. Business & Strategic Implications
+
+- **Cost of Defects**: A bug found in a notebook costs \$10 to fix. A bug found in Unit Testing costs \$50. A bug found in Production costs \$10,000+ (reputation, data cleanup, retraining).
+- **Audit Readiness**: When an auditor asks, "How do you know your data pipeline cleans PII correctly?", you don't wave your hands. You point to `tests/test_pii_scrubber.py` and the last CI/CD run logs.
+
+## 8. Common Pitfalls & Misconceptions
+
+- **Testing the Library**: Do not test if `pandas.read_csv` works. The Pandas team already tested that. Test **your logic** around the data.
+- **Mocking Everything**: If you mock the database, the S3 bucket, and the model, you are testing nothing but your own mocks. Rule of thumb: Mock external IO (slow/costly), but use real (small) data fixtures for logic.
+- **Floating Point Equality**: Never use `assert x == y` for floats. Use `assert x == pytest.approx(y, abs=1e-6)`.
+
+## 9. Required Trade-offs (Explicitly Resolved)
+
+### Velocity vs. Reliability
+
+- **The Conflict**: "I'm just exploring data, writing tests slows me down."
+- **The Resolution**:
+  - **Phase 1 (Exploration)**: No tests. Notebooks are fine.
+  - **Phase 2 (Consolidation)**: The moment code moves from a notebook cell to a Python function (`def ...`), it **must** have a test. No code enters the main branch without a test. This is the "Production Gate."
+
+## 10. Next Steps
+
+### Immediate Action
+
+1.  Install `pytest` in your environment.
+2.  Create a `tests/` folder.
+3.  Take one critical function from your current project (e.g., a data cleaner) and write one test case for it handling `None` or empty input.
+
+### Coming Up Next
+
+**Day 5** introduces **CI/CD for Machine Learning (MLOps)**. We have an environment, versioned data, containers, and now tests. We will wire this all into a GitHub Actions pipeline that runs these tests automatically whenever you push code.
+
+## 11. Further Reading
+
+- **Standard**: _Pytest Documentation_ - Concise and readable.
+- **ML Specific**: _Testing Machine Learning Systems_ (Eugene Yan) - Excellent overview of the specific challenges in ML testing.
+- **Tooling**: _Pandera_ - A statistical data validation library for pandas.

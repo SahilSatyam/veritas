@@ -7,7 +7,7 @@ export default function Footer() {
       <div className="container">
         <div className={styles.content}>
           <div>
-            © 2024 Responsible AI Series. An auditable open record.
+            © 2026 Responsible AI Series. An auditable open record.
           </div>
           <div className={styles.links}>
             <Link href="/methodology" className={styles.link}>Methodology</Link>

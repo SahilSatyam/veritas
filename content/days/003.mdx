@@ -1,0 +1,237 @@
+---
+title: "Containerization Basics (Docker)"
+subtitle: "Immutable Infrastructure & Cross-Platform Consistency"
+day: "003"
+tags: ["Production", "Infra", "MLOps"]
+---
+
+## 1. Why This Topic Matters
+
+### The Failure Mode
+
+You developed your model on a MacBook Pro (Apple Silicon/ARM64). It runs perfectly. You push it to production (AWS EC2/Linux/x86_64). It crashes instantly with a segmentation fault or a cryptic `glibc` error.
+
+### The Cause
+
+Python environments (Day 1) isolate Python libraries, but they rely on the underlying Operating System for shared libraries (C/C++ compilers, GPU drivers, system binaries). If the OS differs, the application behavior is undefined.
+
+### The Leadership Reality
+
+- **Engineering Velocity**: "It works on my machine" is the single biggest blocker to deployment. Containerization eliminates this debate.
+- **Security**: A compromised server exposes the entire host. A compromised container is (usually) contained.
+- **Scalability**: You cannot auto-scale a "pet" server that was manually configured. You can spin up 1,000 containers in seconds.
+- **System-Wide Implication**: The "Unit of Deployment" is no longer a code file; it is a **Container Image**. This image includes the OS, the code, the data pointers, and the configuration schema.
+
+## 2. Core Concepts & Mental Models
+
+### The "Shipping Container" Metaphor
+
+Before 1956, goods were loaded individually (barrels, sacks). Loading was slow and inconsistent. The shipping container standardized dimensions. Docker does the same: it wraps your messy Python app in a standard box that runs on any server, anywhere.
+
+### Layers & Caching
+
+A Docker image is like a stack of pancakes (layers).
+
+1.  **OS Layer**: Debian/Ubuntu.
+2.  **Runtime Layer**: Python installed.
+3.  **Dependency Layer**: `pip install pandas`.
+4.  **Code Layer**: Your `main.py`.
+
+**Key Concept**: If you change only your code (Layer 4), Docker reuses Layers 1-3 from the cache. This makes builds fast. If you change the OS (Layer 1), everything rebuilds.
+
+### Immutable Infrastructure
+
+Once a container image is built (e.g., `myapp:v1.0`), it is **read-only**. You never SSH into a production container to "fix" a file. You fix the code, rebuild the image (`myapp:v1.1`), and replace the container. This guarantees that what you tested is exactly what is running.
+
+## 3. Theoretical Foundations
+
+### Namespaces & Cgroups (The Magic)
+
+Docker is not virtualization (like a VM). It uses Linux kernel features:
+
+- **Namespaces**: Provide isolation. The process thinks it has its own file system, network, and process ID tree. It cannot see other processes on the host.
+- **Control Groups (cgroups)**: Provide resource limits. You can strictly limit the container to use only 2GB RAM. If it exceeds this (e.g., a memory leak in your model), the kernel kills the container, not the server.
+
+## 4. Production-Grade Implementation
+
+### The Base Image Dilemma: Alpine vs. Slim
+
+**Common Pitfall**: Engineers choose `python:alpine` because it is tiny (5MB). **Production Advice**: Avoid Alpine for AI/Python.
+
+- Alpine uses `musl libc` instead of `glibc`.
+- Most AI libraries (NumPy, PyTorch, pandas) are pre-compiled for `glibc`.
+- Installing them on Alpine requires compiling from source (slow, error-prone) or using hacks.
+
+**Verdict**: Use `python:3.11-slim` (Debian-based, small, compatible).
+
+### The "Secure By Design" Dockerfile
+
+We do not run as `root` inside the container. If an attacker escapes the application, they would have root privileges on the container (and potentially the host).
+
+```dockerfile
+# 1. Base Image (Pin the minor version)
+FROM python:3.11-slim
+
+# 2. Set Environment Variables
+# Prevents Python from buffering stdout (logs appear immediately)
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+# 3. Create a non-root user (Security Best Practice)
+RUN useradd --create-home --shell /bin/bash appuser
+
+# 4. Set Working Directory
+WORKDIR /home/appuser/app
+
+# 5. Install System Dependencies (Minimal)
+# Only install what is strictly necessary. Clean up apt cache to save space.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# 6. Install Python Dependencies
+# Copy only requirements first to leverage Docker Layer Caching
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
+
+# 7. Copy Source Code
+COPY . .
+
+# 8. Switch to non-root user
+USER appuser
+
+# 9. Entrypoint
+# We expect the container to start the model server
+CMD ["python", "main.py"]
+```
+
+## 5. Hands-On Project: The "Failing Container"
+
+**Objective**: Build a container that enforces configuration via environment variables.
+
+**Constraints**:
+
+- Use `python:slim`.
+- Script must fail if `API_KEY` is missing.
+
+### Step 1: The Application Code (`main.py`)
+
+```python
+import os
+import sys
+
+def load_model():
+    # Simulate loading a model
+    print("Initializing Inference Engine...")
+    return "Model_V1"
+
+def check_config():
+    # STRICT CONFIGURATION: Fail fast if secrets are missing
+    api_key = os.environ.get("MODEL_API_KEY")
+    if not api_key:
+        print("CRITICAL ERROR: 'MODEL_API_KEY' environment variable not set.")
+        print("Container refuses to start without secure configuration.")
+        sys.exit(1)
+
+    print(f"Configuration Loaded. Environment: {os.environ.get('ENV', 'Production')}")
+
+if __name__ == "__main__":
+    check_config()
+    model = load_model()
+    print(f"SUCCESS: {model} is running on secure port.")
+```
+
+### Step 2: The Dockerfile
+
+Create the file named `Dockerfile` (no extension) using the Secure By Design template provided in Section 4 (ensure you have a dummy `requirements.txt`, even if empty).
+
+### Step 3: Build & Break
+
+Build the image. Note the `.` at the end (context).
+
+```bash
+docker build -t secure-ai-app:v1 .
+```
+
+**Test 1: Run without config (Must Fail)**
+
+```bash
+docker run --rm secure-ai-app:v1
+```
+
+_Expected Output_:
+
+```
+CRITICAL ERROR: 'MODEL_API_KEY' environment variable not set.
+```
+
+**Test 2: Run with config (Must Succeed)**
+
+```bash
+docker run --rm -e MODEL_API_KEY="secret-123" secure-ai-app:v1
+```
+
+_Expected Output_:
+
+```
+SUCCESS: Model_V1 is running on secure port.
+```
+
+**Validation**: You have just proven that your application's configuration is decoupled from its code and its image. The image is generic; the runtime injection defines the context.
+
+## 6. Ethical, Security & Safety Considerations
+
+- **Vulnerability Scanning**: Container images often contain old OS packages with known vulnerabilities (CVEs).
+  - **Action**: Use tools like Trivy or Docker Scout.
+  - **Command**: `trivy image secure-ai-app:v1`. This will list every vulnerability in your OS layers.
+- **Secrets Leaks**: **NEVER** put `ENV API_KEY=123` inside the Dockerfile. Anyone who pulls the image can read it. Secrets must be injected at runtime (as shown in the project).
+- **The "Root" Trap**: By default, Docker runs as `root`. If your web app has a vulnerability, the attacker is root inside the container. Always use `USER appuser`.
+
+## 7. Business & Strategic Implications
+
+- **Cloud Portability**: If you use Docker, you are not locked into AWS/Azure/GCP specific runtimes (like AWS Lambda zip files). You can move your container to any cloud provider or on-prem server with zero code changes.
+- **Cost Efficiency**: Smaller, optimized images reduce storage costs in the Container Registry (ECR/GCR) and reduce data transfer costs when scaling up thousands of nodes.
+- **Onboarding**: New hires don't install Python, CUDA, or libraries. They install Docker, run `docker-compose up`, and they are working.
+
+## 8. Common Pitfalls & Misconceptions
+
+- **The "Context" Bloat**: Running `docker build .` sends the entire current directory to the Docker daemon. If you have a 2GB `data/` folder there, the build takes forever.
+  - **Fix**: Use `.dockerignore` (works exactly like `.gitignore`). Add `data/`, `.git/`, `venv/`.
+- **Layer Order**: Putting `COPY . .` before `RUN pip install ...` kills your cache. Every time you change a line of code, Docker thinks dependencies changed and re-downloads everything. Always copy requirements and install first.
+- **Latest Tag**: `FROM python:latest`.
+  - **Risk**: "Latest" changes daily. Today it's Python 3.11, tomorrow it's 3.12 (breaking changes). Always pin versions: `python:3.11.4-slim`.
+
+## 9. Required Trade-offs (Explicitly Resolved)
+
+### Build Size vs. Debuggability
+
+- **The Conflict**: A "Distroless" image (Google concept) has only the application binary. No shell, no `ls`, no package manager. It is ultra-secure and tiny. But you cannot `docker exec` in to debug.
+- **The Resolution**: For Day 3 (and most AI teams), we compromise on **Slim**. `python:slim` removes the heavy build tools (gcc) but keeps bash and basic utilities. This balances security (smaller attack surface) with the operational reality of needing to inspect a container occasionally.
+- **Exception**: For ultra-high security (banking/defense), use Distroless and rely entirely on logs/telemetry, effectively disabling SSH-style debugging.
+
+## 10. Next Steps
+
+### Immediate Action
+
+1.  Add a `Dockerfile` to your project from Day 2.
+2.  Create a `.dockerignore` file:
+    ```text
+    __pycache__
+    .git
+    .env
+    venv/
+    data/  # IMPORTANT: Data lives in DVC/Volume, not the image
+    ```
+3.  Build and run it locally.
+
+### Coming Up Next
+
+**Day 4** deals with **Testing Strategies for AI**. We have a locked environment (Day 1), versioned data (Day 2), and a portable container (Day 3). Now, how do we verify the model logic without waiting 3 hours for training? We will dive into Unit Testing for ML and Data Validation.
+
+## 11. Further Reading
+
+- **Deep Dive**: _Best Practices for Writing Dockerfiles_ (Official Docker Docs).
+- **Security**: _OWASP Docker Security Cheat Sheet_.
+- **Tooling**: _Hadolint_ - A linter for Dockerfiles that catches bad practices automatically.

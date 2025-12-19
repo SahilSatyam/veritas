@@ -1,0 +1,218 @@
+---
+title: "Version Control for Data & Code (Git & DVC)"
+subtitle: "Provenance, Data Lineage & The Atomic Commit"
+day: "002"
+tags: ["Reproducibility", "MLOps", "Data Infra"]
+---
+
+## 1. Why This Topic Matters
+
+### The Failure Mode
+
+A high-value customer churns. The sales VP demands to know why the "Churn Predictor" flagged them as safe. You open the training notebook. It points to `s3://bucket/training-data/customer_churn_final_v3.csv`. But that file was overwritten last week by an automated pipeline. You have the code, but the data is gone. The explanation is impossible.
+
+### The Leadership Reality
+
+- **Governance Gap**: GDPR and the EU AI Act (Right to Explanation) imply that you can reproduce the state of the system at the moment of inference. Code alone is only half that state.
+- **Technical Debt**: Teams that version code but not data suffer from "silent drift." They cannot distinguish between model regression caused by code bugs versus data quality issues.
+- **Security**: Improper version control is the #1 vector for leaked credentials.
+- **System-Wide Implication**: An AI system is not defined by its code. It is defined by the triplet: **(Code, Data, Configuration)**. If any one of these changes, you have a new system.
+
+## 2. Core Concepts & Mental Models
+
+### The "Atomic System State"
+
+In traditional software, `git sha` defines the system. In AI Engineering, the system definition is:
+
+$$State = (GitSHA_{code} + Hash_{data} + Hash_{config})$$
+
+You must be able to deploy or rollback this entire triplet as a single unit.
+
+### Pointer vs. Blob Storage
+
+Git is designed for text (diffs). It chokes on large binaries (datasets/models).
+
+- **Git**: Tracks the logic and the **pointers** (metadata files).
+- **DVC (Data Version Control)**: Tracks the **blobs** (large files) and stores them in cheap object storage (S3/GCS/Azure), while syncing the metadata to Git.
+
+### The "Clean Repo" Policy
+
+Production training jobs should never run from a "dirty" workspace (uncommitted changes). If the code isn't committed, the result is an "orphan model"—a binary with no parentage, effectively useless for long-term business value.
+
+## 3. Theoretical Foundations
+
+### Merkle Trees & Data Content Addressability
+
+Just as Git uses SHA-1 to identify commits based on content, modern data versioning uses content-addressable storage.
+
+- File content $\rightarrow$ Hash (e.g., MD5/SHA256).
+- The filename in storage **is** the hash itself (e.g., `0a/3b4...`).
+- This ensures deduplication: if you have two 10GB datasets differing by 1 byte, only the chunks that changed are stored (depending on the tool's granularity).
+
+## 4. Production-Grade Implementation
+
+### The Architecture: "The Dual-Repository Pattern"
+
+We don't actually need two Git repos, but we conceptually treat the repo as having two layers.
+
+1.  **The Logic Layer (Git)**:
+
+    - `src/`: Python source code.
+    - `dvc.yaml`: The pipeline definition.
+    - `data.dvc`: The text pointer file (KB in size).
+
+2.  **The Storage Layer (DVC Remote)**:
+    - S3 Bucket / GCS Bucket.
+    - Holds the actual TB-scale datasets and model artifacts.
+
+### Configuration Management
+
+- **Anti-Pattern**: Hardcoding hyperparameters in `train.py`.
+- **Pattern**: `params.yaml`.
+  - DVC tracks this file. When you change `learning_rate` from 0.01 to 0.001, Git records the change. DVC binds that config change to the resulting model metrics.
+
+## 5. Hands-On Project: The "Time-Travel" Mechanism
+
+**Objective**: Create a reproducible pipeline where we modify data and code, then mathematically prove we can restore the exact previous state.
+
+**Constraints**:
+
+- Assume `git` is installed.
+- We will use `dvc` (standard open-source tool) for data linkage.
+- Local simulation (no cloud creds needed for this exercise, we'll use a local dir as "remote").
+
+### Step 1: Project Initialization & Safety
+
+First, establish the security boundary.
+
+```bash
+mkdir ai-provenance-lab
+cd ai-provenance-lab
+git init
+dvc init
+
+# THE MOST IMPORTANT STEP: Security Boundary
+# Create a .gitignore immediately to prevent secrets leakage
+echo ".env" >> .gitignore
+echo "__pycache__/" >> .gitignore
+echo "*.csv" >> .gitignore  # We rely on DVC for CSVs, never Git
+```
+
+### Step 2: Create "Version 1" (The Baseline)
+
+We create a dummy dataset and a training script.
+
+```bash
+# 1. Create Data
+echo "feature1,feature2,label" > data.csv
+echo "1.0,2.0,0" >> data.csv
+echo "2.0,1.0,1" >> data.csv
+
+# 2. Track Data with DVC
+# This adds data.csv to .gitignore and creates data.csv.dvc
+dvc add data.csv
+
+# 3. Create Training Code
+cat <<EOF > train.py
+import pandas as pd
+# Read data
+df = pd.read_csv("data.csv")
+print(f"Training on {len(df)} records. Model Version: V1")
+EOF
+
+# 4. Commit the State (The "Atomic" Commit)
+git add .
+git commit -m "Initialize System V1: Baseline data and logic"
+git tag v1.0
+```
+
+### Step 3: Mutate System to "Version 2"
+
+Now we change both the data (drift) and the code (logic change).
+
+```bash
+# 1. Modify Data (Simulate data drift/update)
+echo "3.0,3.0,1" >> data.csv
+dvc add data.csv # Updates the hash in data.csv.dvc
+
+# 2. Modify Code
+cat <<EOF > train.py
+import pandas as pd
+df = pd.read_csv("data.csv")
+# Logic change: Added detailed logging
+print(f"Advanced Training on {len(df)} records. Model Version: V2")
+EOF
+
+# 3. Commit the State
+git add .
+git commit -m "Upgrade to V2: New data + New logic"
+git tag v2.0
+```
+
+### Step 4: The Rollback (Audit Verification)
+
+**Scenario**: V2 is crashing in production. You must immediately revert to the exact state of V1 to debug.
+
+```bash
+# 1. Check out the V1 code
+git checkout v1.0
+
+# At this moment:
+# - train.py is back to V1.
+# - data.csv.dvc (the pointer) is back to V1.
+# - BUT: data.csv (the actual file) is still V2! This is dangerous.
+
+# 2. Synchonize Data to Code
+dvc checkout
+
+# 3. Verify
+python train.py
+# Output MUST be: "Training on 2 records. Model Version: V1"
+```
+
+**Validation**: If the output says "2 records", you have successfully decoupled and recoupled code and data state. You have achieved provenance.
+
+## 6. Ethical, Security & Safety Considerations
+
+- **Security (Secrets)**: The `.gitignore` step is not optional. A common breach occurs when engineers hardcode API keys in a notebook to "test quickly," then commit the notebook. Use `python-dotenv` and keep keys in `.env` (which is git-ignored).
+- **Governance (GDPR)**: If a user demands "Right to be Forgotten," you must identify every dataset version containing their PII. DVC allows you to trace which models were trained on that specific dataset version, necessitating retraining.
+- **Safety**: Without data versioning, you cannot perform "Bisecting." If a safety guardrail fails, you need to know if it was a code change or a data poisoning attack.
+
+## 7. Business & Strategic Implications
+
+- **Competitive Advantage**: The team that can rollback instantly has higher velocity. Teams without data versioning are paralyzed by fear of breaking things, slowing down deployment.
+- **Asset Management**: Data is a company asset. Storing it on a laptop or a shared drive is negligent. DVC + Cloud Storage turns data into a managed, backed-up, versioned asset.
+- **Bus Factor**: If the engineer who "knows where the clean data is" leaves, the project dies. Versioning institutionalizes this knowledge.
+
+## 8. Common Pitfalls & Misconceptions
+
+- **The "Git-LFS" Trap**: Git Large File Storage (LFS) works, but it's often expensive and slows down `git clone` significantly for massive repositories. DVC is usually preferred for ML because it separates the storage backend (cheap S3) from the version control.
+- **"I'll version the data folder name"**: `data_v1/`, `data_v2/`. This breaks code (you have to rewrite paths) and bloats storage. Use a single path `data/` and let the tool manage the versions.
+- **Committing Notebook Outputs**: Notebooks with output cells contain data snippets. This is a data leak risk. Use tools like `nbstripout` to clean notebooks before committing.
+
+## 9. Required Trade-offs (Explicitly Resolved)
+
+### Speed vs. Traceability
+
+- **The Conflict**: Running `dvc add` and `git commit` takes 30 seconds. Overwriting the file takes 0.1 seconds. During rapid experimentation ("hacking"), engineers hate the overhead.
+- **The Resolution**:
+  - **Local/Dev**: Overwrite freely. Dirty states are allowed on `feature/` branches during active iteration.
+  - **Merge/Train**: You cannot merge to `main` or trigger a production training run without a clean commit hash and pushed data. The CI/CD pipeline should block any build where `git status` is not clean or `dvc status` shows divergence.
+
+## 10. Next Steps
+
+### Immediate Action
+
+1.  Initialize `dvc` in your Day 1 repo.
+2.  Add your `data/` folder to `.gitignore`.
+3.  Push a data version to a remote (or local cache) and verify you can delete the file and restore it with `dvc pull`.
+
+### Coming Up Next
+
+**Day 3** focuses on **Unit Testing for Data & ML**. Now that we have a pinned environment (Day 1) and versioned data (Day 2), we must prove that the data is correct before we let it touch our model. We will introduce "Great Expectations" and defensive data coding.
+
+## 11. Further Reading
+
+- **Tooling**: _DVC Documentation_ - Get Started
+- **Concept**: _The ML Test Score: A Rubric for ML Production Readiness_ (Google) - specifically the sections on reproducibility.
+- **Security**: _Remove sensitive data from a repository_ - What to do if you did commit a secret (History rewriting).
