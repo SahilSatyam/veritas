@@ -9,6 +9,8 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
+import { Analytics } from "@vercel/analytics/next";
+
 export const metadata: Metadata = {
   title: "Veritas",
   description: "Responsible AI Series",
@@ -28,6 +30,7 @@ export default function RootLayout({
         <NavBar />
         <main style={{ minHeight: 'calc(100vh - 160px)' }}>{children}</main>
         <Footer />
+        <Analytics />
       </body>
     </html>
   );
