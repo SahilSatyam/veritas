@@ -1,0 +1,217 @@
+---
+title: "Evaluation Metrics for Business"
+subtitle: "Translating Math into Money & Safety"
+day: "009"
+tags: ["Production", "Metrics", "ROI"]
+---
+
+## 1. Why This Topic Matters
+
+**The Failure Mode:** You optimize a fraud detection model for "Accuracy." Since 99.5% of transactions are legitimate, the model achieves 99.5% accuracy by predicting "Legitimate" for _every single transaction_. It catches zero fraud. The company loses $5M in chargebacks. The Data Scientist says, "But accuracy is high!" The CEO fires them.
+
+**The Cause:** **Metric Misalignment.** Accuracy is a vanity metric for imbalanced problems. It treats all errors as equal. In the real world, errors have vastly different costs.
+
+**The Leadership Reality:**
+
+- **The Translation Layer:** Your job is not to report "AUC of 0.85." Your job is to report "We will save $2M/year but accidentally block 500 legitimate customers."
+- **The Trade-off Owner:** You must force stakeholders to choose: "Do you hate False Positives (customer insult) more than False Negatives (fraud loss)?"
+- **Safety Critical:** In healthcare or criminal justice, optimizing the wrong metric (e.g., maximizing conviction rates without regard for false convictions) destroys lives.
+
+**System-Wide Implication:** The loss function trains the model, but the evaluation metric trains the business. If they diverge, the system fails.
+
+---
+
+## 2. Core Concepts & Mental Models
+
+### The Confusion Matrix
+
+This is the atomic unit of evaluation. Every prediction falls into one of four buckets.
+
+1. **True Positive (TP):** Fraudster correctly caught. _(Good)_
+2. **True Negative (TN):** Good user correctly allowed. _(Good)_
+3. **False Positive (FP - Type I Error):** Good user accused of fraud. _(The "Insult")_
+4. **False Negative (FN - Type II Error):** Fraudster let through. _(The "Leak")_
+
+### The Precision/Recall Tug-of-War
+
+You cannot maximize both simultaneously.
+
+- **Precision ($ \frac{TP}{TP+FP} $):** "When we flag fraud, how often are we right?" (High Precision = Few insults, but we miss subtle fraud).
+- **Recall ($ \frac{TP}{TP+FN} $):** "Out of all actual fraud, how much did we catch?" (High Recall = We catch everything, but we insult many good users).
+
+**Decision Framework:**
+
+- **Use High Recall when:** Missing a positive is fatal (Cancer detection, Terrorist identification, Factory safety failure).
+- **Use High Precision when:** A false alarm is expensive (Spam filter, High-frequency trading execution).
+
+---
+
+## 3. Theoretical Foundations
+
+**Threshold Moving:**
+Classifiers don't output "Yes/No." They output a probability (0.0 to 1.0). The default threshold is 0.5.
+
+- If we move threshold to 0.9: Precision $\uparrow$, Recall $\downarrow$ (Conservative).
+- If we move threshold to 0.1: Recall $\uparrow$, Precision $\downarrow$ (Aggressive).
+
+**ROC & AUC:**
+
+- **ROC Curve:** Plots True Positive Rate vs. False Positive Rate at _every possible threshold_.
+- **AUC (Area Under Curve):** The probability that the model ranks a random positive example higher than a random negative one. It measures "Separability."
+
+---
+
+## 4. Production-Grade Implementation
+
+### The "Business Value" Metric
+
+Stop optimizing F1-score (the harmonic mean). Optimize **Profit**.
+
+### The Code Pattern
+
+We calculate profit across all thresholds to find the "Business Optimal" operating point.
+
+```python
+import numpy as np
+import pandas as pd
+from sklearn.metrics import confusion_matrix
+
+def calculate_business_value(y_true, y_prob, threshold, cost_matrix):
+    """
+    Calculates profit based on custom cost matrix.
+    cost_matrix = {'TP': val, 'TN': val, 'FP': cost, 'FN': cost}
+    """
+    y_pred = (y_prob >= threshold).astype(int)
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+
+    profit = (tp * cost_matrix['TP']) + \
+             (tn * cost_matrix['TN']) - \
+             (fp * cost_matrix['FP']) - \
+             (fn * cost_matrix['FN'])
+
+    return profit, {'TP': tp, 'FP': fp, 'FN': fn, 'TN': tn}
+```
+
+---
+
+## 5. Hands-On Project: The "Profit Maximizer"
+
+**Objective:** We have a fraud model. We need to set the threshold that maximizes dollars saved, not F1 score.
+
+**Scenario:**
+
+- **Value of Catching Fraud (TP):** $100 (Avg transaction value saved).
+- **Value of Clearing Good User (TN):** $0 (Status quo).
+- **Cost of False Alarm (FP):** $10 (Customer service call + insult).
+- **Cost of Missed Fraud (FN):** $100 (Chargeback loss).
+
+**Constraint:** Use the probability output from a Logistic Regression.
+
+### Step 1: Generate Data & Model
+
+```python
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+
+# 1. Simulate Imbalanced Fraud Data (5% Fraud)
+X, y = make_classification(n_samples=5000, weights=[0.95], random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=42)
+
+# 2. Train Model
+model = LogisticRegression(class_weight='balanced') # Important for imbalance!
+model.fit(X_train, y_train)
+
+# 3. Get Probabilities (Not predictions!)
+y_probs = model.predict_proba(X_test)[:, 1]
+```
+
+### Step 2: The Optimization Loop
+
+```python
+# Define Financials
+COSTS = {'TP': 100, 'TN': 0, 'FP': 10, 'FN': 100}
+
+thresholds = np.arange(0.0, 1.01, 0.01)
+profits = []
+
+for t in thresholds:
+    val, _ = calculate_business_value(y_test, y_probs, t, COSTS)
+    profits.append(val)
+
+# Find Optimal Threshold
+best_idx = np.argmax(profits)
+best_threshold = thresholds[best_idx]
+max_profit = profits[best_idx]
+
+print(f"Optimal Threshold: {best_threshold:.2f}")
+print(f"Projected Profit: ${max_profit:,.0f}")
+
+# Compare to Default 0.5
+default_profit, _ = calculate_business_value(y_test, y_probs, 0.5, COSTS)
+print(f"Default (0.5) Profit: ${default_profit:,.0f}")
+print(f"Optimization Value Add: ${max_profit - default_profit:,.0f}")
+```
+
+**Expected Result:** The optimal threshold often shifts away from 0.5 depending on whether FP or FN is more expensive. If FP is cheap ($10) and FN is expensive ($100), the threshold will lower (e.g., to 0.2) to catch more fraud.
+
+---
+
+## 6. Ethical, Security & Safety Considerations
+
+- **Disparate Impact Analysis:**
+- **The Risk:** A threshold of 0.6 might be optimal for the whole population, but for a minority group, it might result in a Recall of 0.2 (missing 80% of qualified candidates).
+- **The Action:** Calculate Precision/Recall _separately_ for sensitive subgroups (Race, Gender, Age).
+- **The Hard Choice:** You may need different thresholds for different groups to achieve "Equal Opportunity," or accept the trade-off. This is a legal/ethics decision, not just engineering.
+
+- **Feedback Loops:** If you block users (FP), you never get "Ground Truth" labels for them (you never know if they _were_ fraud). This blinds the model over time. You must occasionally allow a small "Control Group" of risky transactions to re-calibrate.
+
+---
+
+## 7. Business & Strategic Implications
+
+- **SLA (Service Level Agreement):** Metrics translate to contracts. "We guarantee 99.9% availability" is an Ops metric. "We guarantee &lt;1% False Positive Rate" is an AI Product metric.
+- **Cost Sensitivity:** If the cost of a False Positive rises (e.g., you start blocking VIP users), the optimal threshold shifts. The model code doesn't change, but the _configuration_ (threshold) must update.
+- **The "Human in the Loop" Filter:** If the model has low confidence (e.g., probability 0.4 - 0.6), send to a human reviewer. This costs money but saves accuracy.
+
+---
+
+## 8. Common Pitfalls & Misconceptions
+
+- **"We need 99% Precision AND 99% Recall":** Usually impossible. It’s a trade-off curve. Be honest with stakeholders.
+- **Using Accuracy for everything:** As discussed, fatal on imbalanced data.
+- **Ignoring Calibration:** If the model says "0.8 probability," does that actually mean "80% of these cases are positive"? Deep Learning models are often uncalibrated (overconfident). You may need `CalibratedClassifierCV`.
+
+---
+
+## 9. Required Trade-offs (Explicitly Resolved)
+
+**False Positives vs. False Negatives**
+
+- **The Conflict:** Sales wants 0 False Positives (don't block money). Risk wants 0 False Negatives (don't lose money).
+- **The Resolution:** We use the **Cost Matrix**.
+- "VP of Sales, VP of Risk: I need you to agree on the dollar cost of a blocked user vs. a fraud loss. Once you sign off on those numbers, the algorithm decides."
+- This moves the argument from "Tech vs. Business" to "Business vs. Business."
+
+---
+
+## 10. Next Steps
+
+**Immediate Action:**
+
+1. Take the model from Day 8.
+2. Define _your_ cost matrix (even if hypothetical).
+3. Run the loop to find the optimal threshold.
+4. Plot `Profit vs. Threshold`.
+
+**Coming Up Next:**
+Day 10 covers **Model Validation Strategies**. We've optimized the threshold, but how do we ensure the model performs on unseen data? We will dive into Train/Val/Test splits and Time-Series validation.
+
+---
+
+## 11. Further Reading
+
+- **Visual Guide:** [The Precision-Recall Trade-off](https://scikit-learn.org/stable/auto_examples/model_selection/plot_precision_recall.html).
+- **Business:** [Profit Curves in Machine Learning](https://www.google.com/search?q=https://community.alteryx.com/t5/Data-Science/Profit-Curves-Is-It-Worth-It/ba-p/363821).
+- **Ethics:** [Aequitas: Bias and Fairness Audit Toolkit](http://www.datasciencepublicpolicy.org/projects/aequitas/).

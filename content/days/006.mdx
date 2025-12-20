@@ -1,0 +1,244 @@
+---
+title: "Exploratory Data Analysis (EDA) & Profiling"
+subtitle: "Forensic Data Investigation & Bias Detection"
+day: "006"
+tags: ["Safety", "EDA", "Data Governance"]
+---
+
+## 1. Why This Topic Matters
+
+**The Failure Mode:** You train a credit scoring model. It has 94% accuracy. You deploy it. One week later, a tech journalist publishes an exposé: your model automatically rejects applicants from a specific zip code, regardless of their income. This is digital redlining.
+
+**The Cause:** You trusted the summary statistics (`df.describe()`) without visualizing the distributions across subgroups. You missed that the training data for that zip code was sparse, full of nulls, or historically biased.
+
+**The Leadership Reality:**
+
+- **Negligence:** In AI engineering, skipping EDA is not "saving time"; it is professional negligence. You cannot model a terrain you have not mapped.
+- **The "Black Box" Defense Fails:** Regulators do not accept "the model learned it on its own" as an excuse. You are responsible for the data diet you feed the system.
+- **Silent Failures:** Outliers (e.g., using `999` as a placeholder for age) don't break the code, they warp the weights, creating models that fail catastrophically on edge cases.
+
+**System-Wide Implication:** EDA is the first line of defense in AI Safety. It is where you catch "Data Poisoning" and "Representation Bias" before they become "Model Bias."
+
+---
+
+## 2. Core Concepts & Mental Models
+
+### Forensic Investigation vs. "Looking at Data"
+
+Stop thinking of EDA as "making charts." Think of it as **forensic investigation**. You are looking for:
+
+1. **Data Integrity:** Are the nulls random or structural? (e.g., "Income" is only missing for rejected applicants).
+2. **Distribution Shift:** Does the training set match the real world?
+3. **Proxy Variables:** Is "Zip Code" acting as a proxy for race or gender?
+
+### Representation Bias
+
+Bias often stems from **sampling error**. If 95% of your face detection dataset is white men, the model is not "racist" by intent, it is incompetent by design. It literally has not "seen" enough examples of other groups to learn feature representations.
+
+### The "Summary Statistic" Lie
+
+A mean of `50` could come from:
+
+- A normal distribution around 50.
+- A bimodal distribution of 0s and 100s.
+- A single value of 50.
+  Summary statistics hide these dangers. Visualization reveals them.
+
+---
+
+## 3. Theoretical Foundations
+
+**Anscombe's Quartet:**
+This is the foundational proof for why we visualize. Four datasets with identical mean, variance, and correlation coefficient have wildly different graphs (one is linear, one is curved, one is dominated by an outlier).
+
+**Correlation vs. Causation (and Multicollinearity):**
+
+- **Multicollinearity:** When two features (e.g., `annual_income` and `monthly_salary`) are highly correlated ($ \rho > 0.9 $).
+- **Why it hurts:** It makes model interpretation unstable. The model can arbitrarily assign positive weight to one and negative to the other to balance them out, making "feature importance" explanations nonsense.
+
+---
+
+## 4. Production-Grade Implementation
+
+### The Stack
+
+- **Manual Inspection:** `pandas` / `polars` (for speed).
+- **Automated Profiling:** `ydata-profiling` (formerly pandas-profiling). This generates a standardized HTML audit report for every feature.
+- **Targeted Visualization:** `seaborn` or `matplotlib`.
+
+### The Automated Audit Workflow
+
+Do not manually plot 50 histograms. Automate the baseline, then dive deep.
+
+```python
+# The "One-Click" Audit
+from ydata_profiling import ProfileReport
+import pandas as pd
+
+def generate_audit_report(df: pd.DataFrame, report_name: str = "data_audit.html"):
+    profile = ProfileReport(
+        df,
+        title="Responsible AI Data Audit",
+        explorative=True,
+        sensitive=True # Flags high cardinality/PII risks
+    )
+    profile.to_file(report_name)
+```
+
+_Note: This report becomes a compliance artifact. You save it alongside the dataset version (Day 2)._
+
+---
+
+## 5. Hands-On Project: The "Hidden Bias" Hunt
+
+**Objective:** We will generate a synthetic hiring dataset that looks "fair" on aggregate but contains a specific representation bias that automated stats might miss but visualization will catch.
+
+**Constraints:**
+
+- Use `seaborn` / `matplotlib`.
+- Identify the specific bias against a subgroup.
+
+### Step 1: Generate Deceptive Data
+
+We simulate a hiring dataset for a tech company.
+
+- **Feature A:** `experience_years` (Predictive).
+- **Feature B:** `age` (Protected attribute).
+- **Target:** `hired` (1 or 0).
+- **The Trap:** We will introduce a "selection bias" where older candidates are only in the dataset if they were _rejected_.
+
+```python
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Reproducibility (Day 1)
+np.random.seed(42)
+
+def create_biased_dataset(n=1000):
+    # Base population
+    age = np.random.normal(35, 10, n).astype(int)
+    experience = (age - 20) * 0.8 + np.random.normal(0, 2, n)
+    experience = np.clip(experience, 0, 40)
+
+    # Logic: Hired if experience > 5
+    # BUT: Let's introduce bias against Age > 50
+    hired = []
+    for a, e in zip(age, experience):
+        probability = 1 / (1 + np.exp(-(e - 5))) # Sigmoid on experience
+
+        # BIAS INJECTION:
+        # If Age > 50, we artificially drop their probability to 0
+        # unless they are essentially superstars (Exp > 25)
+        if a > 50:
+            probability *= 0.1
+
+        hired.append(1 if np.random.rand() < probability else 0)
+
+    return pd.DataFrame({'Age': age, 'Experience': experience, 'Hired': hired})
+
+df = create_biased_dataset()
+```
+
+### Step 2: The "Naive" Analysis
+
+Run summary stats.
+
+```python
+print(df.groupby('Hired')['Age'].mean())
+# Result: Hired age mean might look slightly lower, but not alarming.
+# Hired: 32.5, Not Hired: 38.1.
+# Engineer might think: "Younger people have less experience, makes sense."
+```
+
+### Step 3: Visual Forensics (The Solution)
+
+We must visualize the interaction between the protected class (Age) and the Outcome (Hired).
+
+```python
+def visualize_bias(df):
+    plt.figure(figsize=(10, 6))
+
+    # Box Plot: Shows the distribution spread clearly
+    # We look for: Are the "Hired" distributions similar across ages?
+    sns.scatterplot(data=df, x='Age', y='Experience', hue='Hired', alpha=0.6)
+
+    # Add a decision boundary visual aid
+    plt.axvline(x=50, color='r', linestyle='--', label='Bias Threshold (Age 50)')
+    plt.title("Hiring Pattern: Experience vs. Age")
+    plt.legend()
+    plt.show()
+
+visualize_bias(df)
+```
+
+**The Insight:**
+When you look at the Scatterplot:
+
+- **Left of Age 50:** You see a mix of Hired (Orange) and Rejected (Blue) based on Experience.
+- **Right of Age 50:** You see a "Blue Wall." Almost no one is hired, even those with high experience (top right quadrant).
+- **Conclusion:** The data proves that `Experience` predicts hiring _except_ when `Age > 50`. The model has learned age discrimination.
+
+---
+
+## 6. Ethical, Security & Safety Considerations
+
+- **Privacy (Re-identification Risk):**
+- **Risk:** Visualizing data points (scatter plots) can reveal outliers. If there is only one "Age 85, Zip Code 90210" in the dataset, you have just identified a specific person.
+- **Control:** In production reports, use "Binning" or "K-Anonymity." Do not plot raw points if the dataset is sensitive; plot density contours (kdeplot) instead.
+
+- **Representation Bias:**
+- Check the counts of your categorical variables. If "Category A" has 10,000 samples and "Category B" has 50 samples, your model will treat Category B as noise. You must either collect more data or use sampling techniques (Day 7).
+
+---
+
+## 7. Business & Strategic Implications
+
+- **Regulatory Compliance:** The EU AI Act requires "Data Governance" documentation. An automated EDA report serves as evidence that you inspected the data for quality and bias before training.
+- **Brand Reputation:** Launching a biased model is a PR nightmare. Catching it in EDA costs $0. Catching it in the New York Times costs millions.
+- **Cost of Compute:** Training on garbage data is a waste of GPU cycles. Cleaning data _before_ the expensive training run improves ROI.
+
+---
+
+## 8. Common Pitfalls & Misconceptions
+
+- **Pitfall:** Dropping "Nulls" blindly.
+- _Reality:_ Missingness is information. If `Income` is missing, it might mean "Unemployed." By dropping those rows, you bias the model toward employed people.
+
+- **Misconception:** "I'll fix bias by removing the 'Race' column."
+- _Reality:_ Fairness through unawareness fails. The model will use "Zip Code" or "Last Name" as a proxy. You often need to _keep_ the sensitive attribute during EDA to measure the bias, even if you exclude it from training.
+
+- **Tool Fatigue:** Don't write 500 lines of matplotlib code. Use `ydata-profiling` for the broad sweep, then write code for specific hypotheses.
+
+---
+
+## 9. Required Trade-offs (Explicitly Resolved)
+
+**Data Utility vs. Privacy**
+
+- **The Conflict:** To fully understand the data, the engineer needs to see the raw rows (utility). To protect users, we must hide the raw rows (privacy).
+- **The Resolution:**
+- **Secure Environment:** EDA happens in a secure environment (like the one pinned in Day 1/3) with restricted egress.
+- **Aggregation for Reporting:** The _artifacts_ (PDFs/HTML reports) shared with management must use aggregation (histograms/heatmaps), never raw data dumps.
+
+---
+
+## 10. Next Steps
+
+**Immediate Action:**
+
+1. Install `ydata-profiling` and `seaborn`.
+2. Run the "Hands-on Project" code above to see the bias visually.
+3. Run a `ProfileReport` on your own project's dataset. Look at the "Warnings" section.
+
+**Coming Up Next:**
+Day 7 deals with **Data Preprocessing & Feature Engineering**. Now that we've _found_ the issues (outliers, nulls, bias) using EDA, we need robust, reproducible pipelines to _fix_ them before the model sees them.
+
+---
+
+## 11. Further Reading
+
+- **Tooling:** [YData Profiling Documentation](https://docs.profiling.ydata.ai/latest/) - The standard for automated EDA.
+- **Classic Paper:** [Datasheets for Datasets](https://arxiv.org/abs/1803.09010) (Gebru et al.) - How to document the provenance and composition of your data responsibly.
+- **Visualization:** [From Data to Viz](https://www.data-to-viz.com/) - A decision tree for choosing the right chart for your data type.

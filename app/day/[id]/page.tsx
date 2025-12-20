@@ -9,6 +9,8 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import 'katex/dist/katex.min.css';
 
+import CodeBlock from "../../components/CodeBlock";
+
 // Define custom components for MDX
 const components = {
   LensTag,
@@ -16,7 +18,17 @@ const components = {
   h1: (props: React.ComponentPropsWithoutRef<'h1'>) => <h1 className={styles.title} {...props} />,
   h2: (props: React.ComponentPropsWithoutRef<'h2'>) => <h2 className={styles.sectionHeader} {...props} />,
   h3: (props: React.ComponentPropsWithoutRef<'h3'>) => <h3 className={styles.sectionHeader} style={{ fontSize: '1.2rem', marginTop: '2rem' }} {...props} />,
-  pre: (props: React.ComponentPropsWithoutRef<'pre'>) => <pre className={styles.codeBlock} {...props} />,
+  pre: (props: React.ComponentPropsWithoutRef<'pre'>) => <CodeBlock {...props} />,
+  a: (props: React.ComponentPropsWithoutRef<'a'>) => {
+    const isExternal = props.href?.startsWith('http');
+    return (
+      <a 
+        {...props} 
+        target={isExternal ? "_blank" : undefined} 
+        rel={isExternal ? "noopener noreferrer" : undefined} 
+      />
+    );
+  },
   // We wrap paragraphs in a Fragment effectively, but styling is handled by container .prose
 };
 

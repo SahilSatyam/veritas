@@ -1,0 +1,248 @@
+---
+title: "CI/CD for ML: The Death of 'It Works on My Machine'"
+subtitle: "Manual Deployment Errors"
+day: "017"
+tags: ["GitHub Actions", "CI/CD", "DevOps", "Testing", "Automation"]
+date: "2026-01-17"
+---
+
+### Abstract
+
+In mature engineering organizations, humans do not deploy software. Pipelines deploy software. In Machine Learning, however, this discipline often collapses. Data scientists frequently `scp` model weights directly to production servers or manually upload `.pkl` files to S3 buckets. This practice, known as "Shadow IT," results in version mismatches ("Wait, is `model_final_v2.bin` the one with the bias fix?"), lack of audit trails, and catastrophic rollbacks. This article establishes a rigid CI/CD (Continuous Integration/Continuous Deployment) pipeline using GitHub Actions, ensuring that the only path to production is through code that has passed every test defined in previous days.
+
+---
+
+### 1. Why This Topic Matters
+
+The specific failure mode this prevents is the **Manual Deployment Error**.
+
+- **The Versioning Hell:** A developer trains a model on their laptop, gets good results, and manually copies it to the production server. Two weeks later, the server restarts and loads an old version because the manual file wasn't persisted or versioned correctly.
+- **The Dependency Drift:** The model works in the notebook because `pandas` is version 1.5.3. It fails in production because the server is running 2.0.1.
+- **The Security Hole:** Manual deployment usually requires giving developers SSH keys to production servers. This violates the Principle of Least Privilege.
+
+**The Golden Rule:** Production environments should be **immutable**. No human should have write access to them. Only the CI/CD bot has write access.
+
+---
+
+### 2. Core Concepts & Mental Models
+
+#### CI vs. CD in the Context of ML
+
+- **Continuous Integration (CI):** "Don't merge garbage."
+- Runs on every Pull Request (PR).
+- Checks: Code formatting (Linting), Logic integrity (Unit Tests), Security vulnerabilities (Dependency scanning).
+- _Goal:_ Feedback in < 5 minutes.
+
+- **Continuous Deployment (CD):** "Ship it safely."
+- Runs on Merge to Main.
+- Actions: Build Docker container, push to registry, deploy to Kubernetes/Lambda, update Model Registry.
+
+#### The "Slow Test" Trade-off (Speed vs. Safety)
+
+In traditional web dev, tests are fast. In ML, running a full "Model Regression Test" (training a model and evaluating it on 10k rows) can take hours.
+
+- **The Conflict:** If you run full training on every PR, developers wait 4 hours to merge a typo fix. They will revolt.
+- **The Resolution:**
+- **PR Pipeline (Fast):** Runs Linting + Unit Tests + "Smoke Test" (Inference on 10 examples). Blocks the merge.
+- **Nightly/Staging Pipeline (Slow):** Runs full evaluation. Reports back metrics.
+
+---
+
+### 3. Theoretical Foundations (The Config as Code)
+
+We move away from clicking buttons in a UI (AWS Console) to defining infrastructure and process as code (`YAML`).
+
+- **Reproducibility:** If the build steps are in a file, anyone can reproduce the build.
+- **Auditability:** `git blame` tells you exactly who changed the deployment logic and when.
+
+---
+
+### 4. Production-Grade Implementation
+
+We will use **GitHub Actions**. It is integrated, free for public repos, and the industry standard for modern open-source and enterprise projects.
+
+**Key Components:**
+
+1. **Workflow (`.yaml`):** The definition of the pipeline.
+2. **Runner:** The server (Ubuntu) that executes the steps.
+3. **Secrets:** Encrypted variables (API Keys) injected into the runner.
+
+**Linting (The Hygiene Check):**
+We enforce **Black** (formatting) and **Flake8** (style/errors). This prevents "bike-shedding" in code reviews (arguing about spacing). If the linter fails, the code is rejected automatically.
+
+---
+
+### 5. Hands-On Project / Exercise
+
+**Objective:** Configure a GitHub Actions workflow that automatically runs whenever code is pushed. It must lint the code and run the unit tests we wrote in Day 4. If any test fails, it must block the merge.
+
+**Constraint:** Do not hardcode credentials.
+
+#### Step 1: Define the Workflow File
+
+Create `.github/workflows/ml-ci.yaml` in your repository.
+
+```yaml
+name: ML Production Pipeline
+
+# Trigger: Run on Push to Main or any Pull Request
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout Code
+      - uses: actions/checkout@v3
+
+      # 2. Setup Python Environment
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+          cache: "pip" # Caching speeds up builds significantly
+
+      # 3. Install Dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 black pytest
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      # 4. Linting (Enforce Style)
+      - name: Lint with Black
+        run: |
+          # Check if code is formatted correctly. 
+          # --check means "don't change it, just fail if it's wrong"
+          black . --check
+
+      - name: Lint with Flake8
+        run: |
+          # stop the build if there are Python syntax errors or undefined names
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      # 5. Unit Testing (The Guardrail)
+      - name: Run Unit Tests with Pytest
+        env:
+          # INJECT SECRETS HERE. Never print them.
+          # Even if tests need an API key, we inject it securely.
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          # Run tests and generate a report
+          pytest tests/ --doctest-modules --junitxml=junit/test-results.xml
+```
+
+#### Step 2: The "Blocker" Configuration
+
+Writing the YAML isn't enough. You must configure GitHub to respect it.
+
+1. Go to Repo **Settings** -> **Branches**.
+2. Add a **Branch Protection Rule** for `main`.
+3. Check **"Require status checks to pass before merging"**.
+4. Select `build-and-test` from the list.
+
+Now, if a developer pushes broken code, the "Merge" button turns grey and says "Checks Failed."
+
+---
+
+### 6. Ethical, Security & Safety Considerations
+
+- **Secret Leaks in Logs:**
+- _Risk:_ A developer prints an environment variable to debug a test: `print(os.environ['AWS_KEY'])`.
+- _Defense:_ GitHub Actions automatically masks known secrets, but it's not perfect. **Rule:** Never print variables in CI scripts. Use `add-mask` commands if you must manipulate secrets.
+
+- **Supply Chain Attacks:**
+- If you just run `pip install -r requirements.txt`, you are trusting the internet. If a malicious package is published, your CI pipeline downloads and executes it inside your internal network.
+- _Mitigation:_ Use **Dependency Pinning** (hashes) and tools like `Dependabot` or `Snyk` to scan for compromised packages.
+
+---
+
+### 7. Business & Strategic Implications
+
+**Velocity via Confidence:**
+Counter-intuitively, strict CI/CD makes teams faster.
+
+- _Without CI:_ Developers hesitate to refactor code because "it might break something invisible."
+- _With CI:_ Developers refactor aggressively. If the pipeline stays green, they know they haven't broken the core logic.
+
+**The "Bus Factor" Mitigation:**
+The pipeline documents exactly how to build the software. If the lead engineer wins the lottery, the new hire can deploy by simply merging a PR. The knowledge is in the YAML, not the human's head.
+
+---
+
+### 8. Code Examples / Pseudocode
+
+**Automating Model Publishing (CD Step):**
+This job runs _only_ after tests pass and code is merged to main.
+
+```yaml
+deploy-model:
+  needs: build-and-test # Wait for tests to pass
+  if: github.ref == 'refs/heads/main' # Only run on main branch
+  runs-on: ubuntu-latest
+
+  steps:
+    - uses: actions/checkout@v3
+
+    - name: Authenticate to Cloud
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
+
+    - name: Push to Model Registry
+      run: |
+        # Zip the code + model artifact
+        tar -czf model-v${{ github.sha }}.tar.gz model/ src/
+        # Upload to S3 (Immutable Artifact)
+        aws s3 cp model-v${{ github.sha }}.tar.gz s3://my-model-registry/prod/
+```
+
+---
+
+### 9. Common Pitfalls & Misconceptions
+
+1. **Testing in Production:**
+
+- _Fallacy:_ "I'll just merge it and check the logs."
+- _Reality:_ This is not engineering; this is gambling.
+
+2. **Flaky Tests:**
+
+- _Problem:_ A test fails 10% of the time due to randomness (network, timing).
+- _Consequence:_ Developers stop trusting the red light. They force merge.
+- _Fix:_ Remove the randomness. Mock the network. Set random seeds.
+
+3. **The "Mega-Container":**
+
+- Building a 10GB Docker container on every commit is too slow. Use layer caching or slim base images.
+
+---
+
+### 10. Prerequisites & Next Steps
+
+**Prerequisites:**
+
+- A GitHub repository.
+- The tests created in Day 4.
+- Understanding of `pip` and `requirements.txt`.
+
+**Next Steps:**
+
+- We have a safe pipeline (Day 17) and we know about LLMs (Day 15).
+- The biggest risk with LLMs isn't "broken code," it's "broken prompts" or "malicious inputs."
+- Move to **Day 18: Data Lineage: The Chain of Custody for AI**.
+
+---
+
+### 11. Further Reading & Resources
+
+- **Documentation:** [GitHub Actions for Python](https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python).
+- **Tool:** [Act (Run GitHub Actions locally)](https://github.com/nektos/act) - Save time by testing pipelines on your laptop.
+- **Concept:** [The 12-Factor App (Build, Release, Run)](https://12factor.net/build-release-run).

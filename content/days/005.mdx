@@ -1,0 +1,251 @@
+---
+title: "Experiment Tracking & The 'Zombie Model' Problem"
+subtitle: "Scientific Rigor, Observability & Auditable Provenance"
+day: "005"
+tags: ["Reproducibility", "MLOps", "Scientific Rigor"]
+---
+
+## 1. Why This Topic Matters
+
+**The Failure Mode:** You inherit a high-performing model currently in production. It is critical to the business. The data distribution shifts, and performance drops. You need to retrain it. You open the repo, but you cannot find the exact script, hyperparameters, or dataset version that produced the `model.bin` file currently running. You have a **"Zombie Model"**, it's alive, but it cannot reproduce.
+
+**The Cause:** Relying on memory, sporadic Git commits, or spreadsheets to track machine learning experiments.
+
+**The Leadership Reality:**
+
+- **Scientific Debt:** If you cannot reproduce a result, it wasn't science; it was luck. Luck is not a strategy.
+- **Key Person Risk:** If only one engineer knows "how to tune the model," you have a single point of failure.
+- **Regulatory Audits:** When an auditor asks, "Show me the evidence that you selected the model with the least bias, not just the highest accuracy," a screenshot of a dashboard is your best defense.
+
+**System-Wide Implication:** The tracking server is the "Flight Recorder" of your AI factory. It captures the decision-making process behind the artifact.
+
+---
+
+## 2. Core Concepts & Mental Models
+
+### The "Run" as the Unit of Work
+
+In software, we track "Commits." In AI, we track "Runs." A Run encapsulates:
+
+1. **Inputs (Parameters):** Hyperparameters ($ \alpha, \beta $), Git SHA (Code), Data Hash (from Day 2).
+2. **Outputs (Metrics):** Quantitative results ($ Accuracy, F1, Loss $).
+3. **Artifacts:** The heavy files (the model binary, confusion matrix images, ROC curves).
+
+### The Experiment Dashboard vs. The Excel Sheet
+
+Excel sheets break. They don't auto-capture Git hashes. They don't visualize loss curves. An Experiment Tracking System (MLflow, Weights & Biases) provides a queryable database of every attempt you've ever made.
+
+### The "Golden Run"
+
+Out of 100 experiments, only one becomes the "Golden Run", the candidate promoted to production. Tracking systems allow you to tag this run (e.g., `stage="staging"`) and trace its lineage forever.
+
+---
+
+## 3. Theoretical Foundations
+
+**Hyperparameter Optimization (HPO) Surface:**
+We are searching a high-dimensional space for the optimal configuration.
+
+$$ L(\theta, \lambda) $$
+
+Where $ \theta $ are learnable weights and $ \lambda $ are hyperparameters.
+Without tracking, you are traversing this space blindfolded. With tracking, you map the topology of the space, learning which regions (e.g., "High learning rate + Low batch size") yield instability.
+
+---
+
+## 4. Production-Grade Implementation
+
+### The Stack
+
+- **Tool:** **MLflow** (Open Source, standard, local-first) or **Weights & Biases (WandB)** (SaaS, excellent visualization). We will use MLflow for this guide as it requires no account setup.
+- **Pattern:** The "Context Manager" pattern.
+
+### Architecture
+
+Do not run the tracking server on your laptop for a team.
+
+- **Local:** Developers log to `http://localhost:5000`.
+- **Production:** Centralized Tracking Server (e.g., on AWS/Azure) backed by a SQL database (Postgres) and an Artifact Store (S3).
+
+### Logging Philosophy
+
+- **Log Parameters Early:** If the run crashes, you still want to know _what_ crashed.
+- **Log Artifacts Late:** Only save the model if the run finishes successfully.
+
+---
+
+## 5. Hands-On Project: The "Optimizer"
+
+**Objective:** Run a hyperparameter sweep on a dummy model, logging results to a local MLflow instance, and identifying the model that balances Accuracy with Fairness.
+
+**Constraints:**
+
+- Use `mlflow`.
+- Simulate a "Fairness Metric" to demonstrate responsible selection.
+- Generate 5 runs automatically.
+
+### Step 1: Setup
+
+Install the library.
+
+```bash
+pip install mlflow scikit-learn pandas
+```
+
+### Step 2: The Training Script (`train_sweep.py`)
+
+We will create a script that accepts parameters, trains a model, and logs everything.
+
+```python
+import mlflow
+import mlflow.sklearn
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import numpy as np
+import random
+
+# 1. Setup Data (Reproducible)
+X, y = make_classification(n_samples=1000, n_features=10, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+def train_run(n_estimators, max_depth, run_name):
+    """
+    Executes a single experiment run.
+    """
+    # Start MLflow Context
+    with mlflow.start_run(run_name=run_name):
+
+        # A. LOG PARAMETERS (Inputs)
+        mlflow.log_param("n_estimators", n_estimators)
+        mlflow.log_param("max_depth", max_depth)
+        mlflow.log_param("data_version", "v1.0") # In real life, get from DVC
+
+        # B. TRAIN MODEL
+        clf = RandomForestClassifier(
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            random_state=42
+        )
+        clf.fit(X_train, y_train)
+
+        # C. CALCULATE METRICS
+        preds = clf.predict(X_test)
+        acc = accuracy_score(y_test, preds)
+
+        # Simulate a Fairness Metric (e.g., Disparate Impact)
+        # In reality, you'd calculate this on a protected group slice
+        # Let's pretend deeper trees are "less fair" for this simulation
+        fairness_score = 0.95 - (max_depth * 0.01) + (random.uniform(-0.02, 0.02))
+
+        # D. LOG METRICS (Outputs)
+        mlflow.log_metric("accuracy", acc)
+        mlflow.log_metric("fairness_score", fairness_score)
+
+        # E. LOG ARTIFACTS (The Model)
+        # This saves the model binary in a standard format
+        mlflow.sklearn.log_model(clf, "model")
+
+        print(f"Run {run_name}: Acc={acc:.4f}, Fairness={fairness_score:.4f}")
+
+# Execute the Sweep (5 runs)
+if __name__ == "__main__":
+    # Define a simple grid
+    configs = [
+        (10, 2),
+        (50, 5),
+        (100, 10),
+        (200, 15),
+        (50, 3)
+    ]
+
+    print("Starting Hyperparameter Sweep...")
+    for i, (n_est, depth) in enumerate(configs):
+        train_run(n_est, depth, run_name=f"sweep_run_{i+1}")
+```
+
+### Step 3: Analysis
+
+Run the script:
+
+```bash
+python train_sweep.py
+```
+
+Then, open the dashboard:
+
+```bash
+mlflow ui
+```
+
+Navigate to `http://127.0.0.1:5000` in your browser.
+
+**The Task:**
+
+1. Select all 5 runs.
+2. Click "Compare".
+3. Look at the Parallel Coordinates Plot (if available) or the Table.
+4. **Identify the Trade-off:** Run 4 (Depth 15) likely has high accuracy but lower fairness. Run 2 (Depth 5) might be the sweet spot.
+5. This "selection decision" is now documented in the tool, not in your head.
+
+---
+
+## 6. Ethical, Security & Safety Considerations
+
+- **Ethics (The Hidden Metric):** You typically get what you measure. If you only track `accuracy`, you will deploy a biased model. You **must** log `bias_metrics` (e.g., False Positive Rate difference between groups) in every run. This forces the trade-off to be visible on the dashboard.
+- **Security:** Be careful logging "Samples." Do not log PII (Personally Identifiable Information) into MLflow as an artifact (e.g., a CSV of failed predictions). MLflow usually has lower access controls than your secure database.
+- **Governance:** The `model` artifact stored in MLflow should be the _only_ path to production. No copying files from laptops.
+
+---
+
+## 7. Business & Strategic Implications
+
+- **Institutional Memory:** When a Senior Engineer leaves, they often take their intuition with them. Experiment tracking captures that intuition ("We tried learning rate 0.1, and it failed") as institutional data.
+- **Resource efficiency:** "Why is our cloud bill so high?" You can look at MLflow to see that Junior Dev X launched 500 massive runs on GPUs over the weekend that didn't converge.
+- **Defensibility:** In a lawsuit regarding AI errors, being able to show the 50 other models you rejected, and _why_ you rejected them, is powerful evidence of due diligence.
+
+---
+
+## 8. Common Pitfalls & Misconceptions
+
+- **Logging Too Much:** If you log the full gradient tensor every step, your tracking server will run out of disk space, and the UI will crash. Log aggregates (mean/std) and log typically once per epoch.
+- **The "One Mega-Run" Fallacy:** Engineers sometimes write a loop inside the run.
+- _Bad:_ `start_run()` -> Loop 100 times changing params -> `end_run()`. This looks like 1 run with confusing metrics.
+- _Good:_ Loop 100 times -> `start_run()` -> Log -> `end_run()`. This creates 100 comparable entries.
+
+- **Forgetting the Environment:** Always log the Git Commit hash (MLflow does this automatically if run from a git repo) and the Environment snapshot (Day 1).
+
+---
+
+## 9. Required Trade-offs (Explicitly Resolved)
+
+**Visibility vs. Noise**
+
+- **The Conflict:** Developers want to log `print` statements and every variable to debug. MLOps leads want clean, comparable dashboards.
+- **The Resolution:**
+- **Debug Logs:** Go to text files (`stdout` / `logs/`).
+- **Tracking Metrics:** Only key performance indicators (KPIs) go to MLflow. If you can't optimize on it, don't track it as a top-level metric.
+- _Rule of Thumb:_ If you wouldn't put it on a slide for a design review, it might not belong in the main metrics table.
+
+---
+
+## 10. Next Steps
+
+**Immediate Action:**
+
+1. Run the hands-on script.
+2. Go to the MLflow UI.
+3. Find the run with the highest "fairness_score" that still has acceptable accuracy.
+4. Copy its `Run ID` (a long hash like `a1b2c3...`). You will need this for Day 6.
+
+**Coming Up Next:**
+Day 6 covers **Exploratory Data Analysis (EDA) & Profiling**. Now that we have tracked our experiments, we need to ensure the data feeding them is sound. We will look at forensic data investigation to catch bias and errors before training.
+
+---
+
+## 11. Further Reading
+
+- **Tooling:** [MLflow Tracking Documentation](https://mlflow.org/docs/latest/tracking.html).
+- **Concept:** [Weights & Biases: The value of Experiment Tracking](https://wandb.ai/site/experiment-tracking).
+- **Reference:** [Google's Rules of ML](https://developers.google.com/machine-learning/guides/rules-of-ml) - Rule #13: "Keep the first model simple" (and track it!).

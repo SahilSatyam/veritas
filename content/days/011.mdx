@@ -1,0 +1,247 @@
+---
+title: "Algorithmic Fairness: Auditing & Mitigation Pipelines"
+subtitle: "De-biasing, Disparate Impact, and The Impossibility Theorem"
+day: "011"
+tags:
+  ["AIF360", "Fairlearn", "Bias Mitigation", "Risk Management", "Compliance"]
+---
+
+### Abstract
+
+The era of "black box" deployment is over. In production environments, a model that optimizes for global accuracy while systematically discriminating against a protected demographic is not an asset; it is a liability. This liability manifests as regulatory fines (e.g., NYC Local Law 144, EU AI Act), reputational collapse, and model instability. This article moves beyond theoretical definitions of fairness to establish a rigorous, engineering-led methodology for auditing bias and implementing algorithmic mitigation strategies (specifically re-weighting) within the ML pipeline. We explicitly reject "fairness through blindness" and instead engineer fairness as a system constraint.
+
+---
+
+### 1. Why This Topic Matters
+
+For decades, software engineering treated inputs neutrally. In AI, inputs contain historical structural inequities. If your training data reflects society, your model will learn society's biases.
+
+The specific failure mode this post prevents is the **uncritical deployment of discriminatory algorithms**.
+
+- **Legal Risk:** In credit, hiring, and housing, disparate impact is illegal regardless of intent.
+- **Performance Risk:** A model that relies on demographic proxies (e.g., zip code as a proxy for race) is often learning spurious correlations rather than causal factors, making it brittle to distribution shifts.
+- **Brand Risk:** Public demonstrations of bias (e.g., facial recognition failures) are difficult to recover from.
+
+We are moving from "Is this model accurate?" to "Is this model compliant and robust across subpopulations?"
+
+---
+
+### 2. Core Concepts & Mental Models
+
+To engineer fairness, we must share a precise vocabulary. Vague notions of "unbiased" do not survive code review.
+
+#### The Fallacy of Fairness Through Blindness
+
+The most dangerous misconception in AI engineering is that removing protected attributes (e.g., race, gender) from the training data ensures fairness.
+
+- **Reality:** Machine learning models are massive correlation engines. Redundant encodings (proxies) exist everywhere. Zip code, alma mater, linguistic patterns, and browsing history often perfectly reconstruct protected attributes.
+- **Constraint:** You _must_ collect protected attributes to audit for fairness, even if you do not use them for inference. You cannot manage what you do not measure.
+
+#### The Impossibility Theorem (Trade-offs)
+
+Mathematical fairness definitions often contradict each other. Kleinberg et al. (2016) proved that except in trivial cases, you cannot simultaneously satisfy:
+
+1. **Calibration:** Risk scores mean the same thing for all groups.
+2. **Balance for the Positive Class:** True Positive Rates are equal.
+3. **Balance for the Negative Class:** False Positive Rates are equal.
+
+**Decision Framework:** You must choose a metric based on the **impact of the prediction**:
+
+- **Punitive/High-Stakes (e.g., Loan Denial, Fraud Flagging):** Prioritize **Equalized Odds** (specifically False Positive Rate parity). You do not want to disproportionately punish innocent members of a minority group.
+- **Assistive/Allocative (e.g., Hiring outreach, Marketing):** Prioritize **Demographic Parity** (Disparate Impact). You want to ensure the resource is distributed roughly equally across groups.
+
+---
+
+### 3. Theoretical Foundations (Only What’s Needed)
+
+We will focus on two industry-standard metrics available in libraries like AIF360 and Fairlearn.
+
+#### Disparate Impact Ratio (DIR)
+
+Measures the ratio of positive outcomes for the unprivileged group relative to the privileged group.
+
+- **Rule of Thumb:** The "80% rule" (from US employment law) suggests a DIR < 0.8 is a red flag for adverse impact.
+
+#### Equalized Odds
+
+Requires that the model creates equal True Positive Rates (Sensitivity) and False Positive Rates across groups.
+
+This ensures the model performs equally well for qualified and unqualified individuals in both groups.
+
+---
+
+### 4. Production-Grade Implementation
+
+Integrating fairness checks requires a shift in the MLOps lifecycle. It is not a post-hoc analysis; it is a pipeline stage.
+
+**The Mitigation Lifecycle:**
+
+1. **Pre-processing:** Modify the training data (e.g., Re-weighting, Oversampling) to kill bias at the source. _Preferred for model agnosticism._
+2. **In-processing:** Modify the learning algorithm (e.g., Adversarial Debiasing) to penalize unfairness during training.
+3. **Post-processing:** Modify the output thresholds (e.g., Calibrated Equalized Odds) to correct decisions after the fact.
+
+For this guide, we focus on **Pre-processing (Re-weighting)** because it is the most transparent, easiest to audit, and does not require altering the core model architecture.
+
+---
+
+### 5. Hands-On Project / Exercise
+
+**Objective:** Build a pipeline that detects gender bias in a credit scoring dataset and mitigates it using IBM's AIF360 Re-weighting algorithm.
+
+**Constraints:**
+
+- Use a Logistic Regression or XGBoost model.
+- Metrics: Accuracy vs. Disparate Impact.
+- Tooling: AIF360 or Fairlearn.
+
+#### Step 1: Setup and Baseline Evaluation
+
+We simulate a credit dataset where "Gender" is the protected attribute (0=Female, 1=Male) and "Credit Approved" is the target.
+
+```python
+import numpy as np
+import pandas as pd
+from aif360.datasets import BinaryLabelDataset
+from aif360.metrics import BinaryLabelDatasetMetric
+from aif360.algorithms.preprocessing import Reweighing
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+
+# 1. Load Data (Conceptual representation)
+# assume df is a cleaned dataframe with 'sex', 'income', 'history', 'target'
+dataset_orig = BinaryLabelDataset(
+    favorable_label=1,
+    unfavorable_label=0,
+    df=df,
+    label_names=['target'],
+    protected_attribute_names=['sex'],
+    privileged_protected_attributes=[np.array([1])], # Male
+    unprivileged_protected_attributes=[np.array([0])] # Female
+)
+
+# 2. Metric Setup
+metric_orig = BinaryLabelDatasetMetric(
+    dataset_orig,
+    unprivileged_groups=[{'sex': 0}],
+    privileged_groups=[{'sex': 1}]
+)
+
+print(f"Original Disparate Impact: {metric_orig.disparate_impact():.4f}")
+# Result: 0.65 (Significant bias against females)
+```
+
+#### Step 2: Mitigation via Re-weighting
+
+We calculate weights for each instance. If a group is underrepresented in the positive class, we up-weight those samples. If overrepresented, we down-weight.
+
+```python
+# 3. Apply Re-weighting
+RW = Reweighing(
+    unprivileged_groups=[{'sex': 0}],
+    privileged_groups=[{'sex': 1}]
+)
+dataset_transf = RW.fit_transform(dataset_orig)
+
+# Verify the training data is now "balanced" regarding the metric
+metric_transf = BinaryLabelDatasetMetric(
+    dataset_transf,
+    unprivileged_groups=[{'sex': 0}],
+    privileged_groups=[{'sex': 1}]
+)
+
+print(f"Transformed Disparate Impact: {metric_transf.disparate_impact():.4f}")
+# Result: 1.00 (Perfectly balanced in training weights)
+```
+
+#### Step 3: Model Training and Comparison
+
+Now we train the model using these sample weights.
+
+```python
+# 4. Train Model with Weights
+# Note: Most sklearn/xgboost models accept sample_weights
+model = LogisticRegression(solver='liblinear')
+model.fit(
+    dataset_transf.features,
+    dataset_transf.labels.ravel(),
+    sample_weight=dataset_transf.instance_weights.ravel()
+)
+
+# 5. Evaluate on Test Set (Not shown for brevity, but crucial)
+# We would now measure the accuracy and disparate impact on holdout data.
+```
+
+---
+
+### 6. Ethical, Security & Safety Considerations
+
+- **Privacy vs. Auditability:** To audit for bias, you need demographic data. If you don't collect it (for privacy reasons), you cannot measure impact.
+- _Solution:_ Use a trusted third party or cryptographic techniques (e.g., Secure Multi-Party Computation) to compute aggregate fairness metrics without exposing individual attributes.
+
+- **The "Two-World" Problem:** Re-weighting assumes the bias comes from sampling error or historical prejudice in the data. If the target variable itself is biased (e.g., "Arrests" as a proxy for "Crime"), re-weighting to match that target simply reproduces the systemic bias more accurately.
+- **Intersectionality:** A model might look fair for "Women" and fair for "Black people" but be deeply discriminatory against "Black Women." Advanced auditing requires analyzing intersecting subgroups.
+
+---
+
+### 7. Business & Strategic Implications
+
+**The Accuracy-Fairness Trade-off:**
+Implementing fairness constraints _usually_ reduces global accuracy on historical data. This is expected.
+
+- **The Executive Conversation:** Do not frame this as "lowering quality." Frame it as "reducing liability risk" and "correcting for historical data corruption."
+- **The Cost of Inaction:** A 2% drop in accuracy is often cheaper than a regulatory inquiry or a class-action lawsuit.
+
+**Strategic Alignment:**
+
+- **Product:** Must define which error is worse (False Positive vs. False Negative) for different groups.
+- **Legal:** Must sign off on the chosen metric (e.g., is 0.8 Disparate Impact sufficient compliance?).
+
+---
+
+### 8. Code Examples / Pseudocode
+
+**Calculating Sample Weights (The Logic):**
+For an unprivileged group member with a positive label:
+
+$$ W = \frac{\text{Expected Probability} \times \text{Total Count}}{\text{Observed Count}} $$
+
+If the group rarely gets positive outcomes in the raw data, the denominator is small, making the weight $ W $ large. The model pays "more attention" to these rare success stories during training.
+
+---
+
+### 9. Common Pitfalls & Misconceptions
+
+1. **"We don't collect race, so we are unbiased."**
+
+- _Correction:_ You are likely biased via proxies and have no way to prove otherwise.
+
+2. **Applying mitigation to the Test Set.**
+
+- _Correction:_ Never re-weight test data. You must evaluate the model's performance on the _real_ distribution (or a specific target distribution), but you mitigate on the _training_ distribution.
+
+3. **One-and-done Auditing.**
+
+- _Correction:_ Drift happens. If the demographics of your user base change, your fairness metrics will shift. Fairness monitoring must be continuous, just like latency monitoring.
+
+---
+
+### 10. Prerequisites & Next Steps
+
+**Prerequisites:**
+
+- Understanding of Confusion Matrices (TP, FP, TN, FN).
+- Experience with `scikit-learn` pipelines.
+
+**Next Steps:**
+
+- Integrate `fairlearn.reductions` if you need to optimize for Equalized Odds rather than Disparate Impact.
+- Move to **Day 12: Explainability (XAI)** to understand _why_ the model is making specific decisions.
+
+---
+
+### 11. Further Reading & Resources
+
+- **Tool:** [IBM AIF360 (AI Fairness 360)](https://www.google.com/search?q=https://aif360.res.ibm.com/)
+- **Tool:** [Microsoft Fairlearn](https://fairlearn.org/)
+- **Paper:** Hardt, Price, Srebro (2016). _Equality of Opportunity in Supervised Learning._
+- **Paper:** Kleinberg et al. (2016). _Inherent Trade-Offs in the Fair Determination of Risk Scores._

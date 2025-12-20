@@ -11,17 +11,22 @@ const days = [
   { id: "002", title: "Version Control for Data & Code", failure: "Silent Drift", lens: "Reproducibility", domain: "Data Infra", status: "done" },
   { id: "003", title: "Containerization Basics (Docker)", failure: "Environment Skew", lens: "Production", domain: "Infra", status: "done" },
   { id: "004", title: "Unit Testing for Data Science", failure: "Silent Logic Failure", lens: "Safety", domain: "QA", status: "done" },
-  { id: "005", title: "Model Versioning Strategies", failure: "Deployment Confusion", lens: "Production", domain: "MLOps", status: "done" },
-  { id: "006", title: "Automated Bias Detection Triggers", failure: "Discriminatory Output", lens: "Safety", domain: "Evaluation", status: "done" },
-  { id: "007", title: "Infrastructure as Code for AI", failure: "Environment Drift", lens: "Reproducibility", domain: "Infra", status: "done" },
-  { id: "008", title: "Cost Attribution in Shared Clusters", failure: "Runaway Costs", lens: "Governance", domain: "Infra", status: "done" },
-  { id: "009", title: "Feature Store Consistency Checks", failure: "Training-Serving Skew", lens: "Production", domain: "Data Infra", status: "done" },
-  { id: "010", title: "Handling PII in Training Data", failure: "Privacy Violation", lens: "Security", domain: "Data Infra", status: "done" },
-  { id: "011", title: "Adversarial Input Filtering", failure: "Prompt Injection", lens: "Safety", domain: "LLMs", status: "done" },
-  { id: "012", title: "Dependency Locking & Scanning", failure: "Supply Chain Attack", lens: "Security", domain: "MLOps", status: "done" },
-  { id: "013", title: "Model Card Automation", failure: "Documentation Drift", lens: "Governance", domain: "MLOps", status: "done" },
-  { id: "014", title: "Continuous Monitoring Patterns", failure: "Silent Degradation", lens: "Production", domain: "MLOps", status: "done" },
-  { id: "015", title: "Feedback Loop Design", failure: "Echo Chambers", lens: "Production", domain: "System", status: "pending" },
+  { id: "005", title: "Experiment Tracking & The 'Zombie Model' Problem", failure: "Zombie Models", lens: "Reproducibility", domain: "MLOps", status: "done" },
+  { id: "006", title: "Exploratory Data Analysis (EDA) & Profiling", failure: "Digital Redlining", lens: "Safety", domain: "Data Science", status: "done" },
+  { id: "007", title: "Feature Engineering & Selection", failure: "Data Leakage", lens: "Reproducibility", domain: "Data Science", status: "done" },
+  { id: "008", title: "Baseline Models & Benchmarking", failure: "Complexity Tax", lens: "Governance", domain: "Data Science", status: "done" },
+  { id: "009", title: "Evaluation Metrics for Business", failure: "Metric Misalignment", lens: "Production", domain: "Data Science", status: "done" },
+  { id: "010", title: "Model Validation Strategies", failure: "Temporal Leakage", lens: "Security", domain: "Data Science", status: "done" },
+  { id: "011", title: "Algorithmic Fairness: Auditing & Mitigation Pipelines", failure: "Deployment of Discriminatory Models", lens: "Ethics", domain: "Model Evaluation", status: "done" },
+  { id: "012", title: "Explainable AI (XAI): From Black Box to Glass Box", failure: "Stakeholder Rejection (The Black Box Problem)", lens: "Human Factors", domain: "Model Evaluation", status: "done" },
+  { id: "013", title: "Data Privacy & Anonymization: The Toxic Waste Model", failure: "Regulatory Non-Compliance (GDPR/CCPA)", lens: "Governance", domain: "Data Engineering", status: "done" },
+  { id: "014", title: "Model Cards: The 'Nutrition Label' for AI", failure: "Model Misuse & Context Collapse", lens: "Ethics", domain: "Governance", status: "done" },
+  { id: "015", title: "The Generative Shift: LLMs, APIs, and Unit Economics", failure: "Architectural Mismatch & Cost Blowout", lens: "Security", domain: "LLMs / Generative AI", status: "done" },
+  { id: "016", title: "Cloud Infrastructure for AI: Compute, Cost, and Carbon", failure: "Bill Shock & Resource Starvation", lens: "Sustainability", domain: "Infrastructure", status: "done" },
+  { id: "017", title: "CI/CD for ML: The Death of 'It Works on My Machine'", failure: "Manual Deployment Errors", lens: "Security", domain: "MLOps", status: "done" },
+  { id: "018", title: "Data Lineage: The Chain of Custody for AI", failure: "The 'Orphan Model' (Provenance Collapse)", lens: "Governance", domain: "Data Engineering", status: "done" },
+  { id: "019", title: "The ROI of AI: Translating F1 Scores to P&L", failure: "Project Cancellation (The 'Science Project' Trap)", lens: "Ethics", domain: "Strategy", status: "done" },
+  { id: "020", title: "Phase 1 Capstone: The 'End-to-End' Production Pipeline", failure: "Integration Hell (Fragmented Architecture)", lens: "Reproducibility", domain: "Orchestration", status: "done" },
 ];
 
 export default function IndexPage() {
@@ -41,10 +46,10 @@ export default function IndexPage() {
       <div className={styles.progressSection}>
         <div className={styles.progressLabel}>
           <span>Series Progress</span>
-          <span>Day 14 of 100</span>
+          <span>Day 20 of 100</span>
         </div>
         <div className={styles.progressBar}>
-          <div className={styles.progressFill} style={{ width: '14%' }}></div>
+          <div className={styles.progressFill} style={{ width: '20%' }}></div>
           {/* Mock visual segments if needed, but simple bar is clean */}
         </div>
       </div>

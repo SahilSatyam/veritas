@@ -1,0 +1,234 @@
+---
+title: "Feature Engineering & Selection"
+subtitle: "Data Leakage, Proxies, and The Pipeline Pattern"
+day: "007"
+tags: ["Reproducibility", "Feature Engineering", "MLOps"]
+---
+
+## 1. Why This Topic Matters
+
+**The Failure Mode:** You build a churn prediction model with 98% accuracy. The business is ecstatic. You deploy it. One month later, the marketing team complains: "The model only flags customers _after_ they have already cancelled."
+
+**The Cause:** **Data Leakage**. You inadvertently included a feature, perhaps `termination_reason_code` or `last_bill_amount_prorated`, that is only populated _after_ the decision to churn has been made. The model learned to read the paperwork, not predict the behavior.
+
+**The Leadership Reality:**
+
+- **False Confidence:** Leakage creates the illusion of success. It is the most common reason for the "Lab vs. Live" performance gap.
+- **Regulatory Risk:** Using "Proxy Variables" (features that correlate with protected attributes like Race or Gender) can lead to disparate impact, even if you removed the sensitive columns.
+- **Operational Waste:** Features cost money to compute and store. Engineering "garbage" features (noise) bloats infrastructure costs and latency.
+
+**System-Wide Implication:** Feature Engineering is not just about math; it is about **Temporal Logic**. You must rigorously ask: _"At the millisecond of inference, will this data point exist?"_
+
+---
+
+## 2. Core Concepts & Mental Models
+
+### The "Time-Travel" Paradox (Leakage)
+
+Leakage occurs when training data contains information that is unavailable at inference time.
+
+- **Target Leakage:** The feature is a byproduct of the label (e.g., `days_since_churn`).
+- **Temporal Leakage:** The train/test split is random instead of chronological. You are training on "next week's" data to predict "last week's" outcome.
+
+### The Proxy Variable Trap
+
+Removing `race` does not make a model colorblind. If you keep `zip_code` (which correlates with race due to housing segregation), the model _will_ reconstruct the demographic data to maximize accuracy. This is **Redundant Encoding**.
+
+### One-Hot vs. Embeddings
+
+- **One-Hot:** Good for low cardinality (e.g., `Color: [Red, Blue]`). Bad for high cardinality (e.g., `ZipCode: [10001, ... 99999]`), it creates sparse, massive matrices.
+- **Embeddings:** Dense vector representations. Essential for high-cardinality features, but reduces interpretability.
+
+---
+
+## 3. Theoretical Foundations
+
+**The Necessity of Scaling:**
+Most algorithms (Linear Regression, Neural Networks, SVMs, K-Means) calculate distance (Euclidean).
+
+$$ d(p, q) = \sqrt{\sum (p_i - q_i)^2} $$
+
+If Feature A is "Age" (0-100) and Feature B is "Salary" (30,000-200,000), Feature B's variance will dominate the distance calculation. Feature A becomes invisible.
+
+- **StandardScaler:** $ z = \frac{x - \mu}{\sigma} $ (Centers around 0, unit variance). Best for normal distributions.
+- **MinMaxScaler:** Scaled to [0, 1]. Sensitive to outliers.
+
+---
+
+## 4. Production-Grade Implementation
+
+### The Scikit-Learn Pipeline
+
+**Anti-Pattern:** Manually scaling data _before_ splitting.
+
+- _Why:_ You calculate the mean ($\mu$) using the _entire_ dataset. This leaks information from the Test set into the Training set.
+- _Correction:_ Fit the scaler _only_ on Train. Transform Test using Train's statistics.
+
+**The Pattern:** Use `sklearn.pipeline.Pipeline`.
+
+```python
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from sklearn.impute import SimpleImputer
+from sklearn.linear_model import LogisticRegression
+
+# This object encapsulates the entire recipe
+pipeline = Pipeline([
+    ('imputer', SimpleImputer(strategy='median')), # Handle missing vars
+    ('scaler', StandardScaler()),                  # Scale features
+    ('model', LogisticRegression())                # Inference
+])
+
+# pipeline.fit(X_train, y_train)
+# pipeline.predict(X_test)
+```
+
+This guarantees that `mean` and `std_dev` are calculated strictly on training data, preventing leakage.
+
+---
+
+## 5. Hands-On Project: The "Leakage Detector"
+
+**Objective:** Build two models. One with a subtle leak, one without. Observe the metric collapse, proving the danger of "too good to be true" results.
+
+**Constraints:**
+
+- Dataset: Simulated Customer Churn.
+- Leak: A variable that implies the user has left.
+
+### Step 1: Generate Data with a Leak
+
+```python
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+
+# Reproducibility
+np.random.seed(42)
+
+def generate_churn_data(n=1000):
+    # Valid Features
+    usage_minutes = np.random.normal(300, 100, n)
+    contract_months = np.random.randint(1, 24, n)
+
+    # Target (Churn)
+    # Logic: Low usage + Short contract = High Churn Probability
+    churn_prob = 1 / (1 + np.exp((usage_minutes - 200)/50 + (contract_months - 12)/5))
+    churn = (np.random.rand(n) < churn_prob).astype(int)
+
+    # THE LEAK: 'cancellation_fee_paid'
+    # This only exists if churn == 1. Otherwise 0.
+    # In reality, this data appears in the DB *after* the event.
+    cancellation_fee = [50 if c == 1 and np.random.rand() > 0.1 else 0 for c in churn]
+
+    df = pd.DataFrame({
+        'usage_minutes': usage_minutes,
+        'contract_months': contract_months,
+        'cancellation_fee': cancellation_fee, # <--- POISON
+        'churn': churn
+    })
+    return df
+
+df = generate_churn_data()
+X = df.drop('churn', axis=1)
+y = df['churn']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+```
+
+### Step 2: Model A (The Leaked Model)
+
+```python
+model_a = RandomForestClassifier(random_state=42)
+model_a.fit(X_train, y_train)
+acc_a = accuracy_score(y_test, model_a.predict(X_test))
+
+print(f"Model A (With Leak) Accuracy: {acc_a:.4f}")
+# Likely > 95%. The model just checks if 'cancellation_fee' > 0.
+```
+
+### Step 3: Feature Importance (The Detective)
+
+```python
+importances = dict(zip(X.columns, model_a.feature_importances_))
+print("Feature Importances:", importances)
+# You will see 'cancellation_fee' dominating (e.g., 0.85).
+# This is the smoking gun.
+```
+
+### Step 4: Model B (The Honest Model)
+
+```python
+# Drop the leak
+X_train_clean = X_train.drop('cancellation_fee', axis=1)
+X_test_clean = X_test.drop('cancellation_fee', axis=1)
+
+model_b = RandomForestClassifier(random_state=42)
+model_b.fit(X_train_clean, y_train)
+acc_b = accuracy_score(y_test, model_b.predict(X_test_clean))
+
+print(f"Model B (Clean) Accuracy: {acc_b:.4f}")
+# Likely ~70-80%. This is the REAL performance.
+```
+
+**Conclusion:** Model A was a hallucination. Model B is reality. If you had deployed Model A, it would have failed because `cancellation_fee` is always 0 at the moment you need to predict churn.
+
+---
+
+## 6. Ethical, Security & Safety Considerations
+
+- **Proxy Discrimination:**
+- _Action:_ During feature selection, calculate the correlation of every candidate feature against protected attributes (Age, Gender, Race).
+- _Threshold:_ If `correlation(ZipCode, Race) > 0.7`, you must document this risk and potentially drop `ZipCode` or use de-biasing techniques.
+
+- **Adversarial Robustness:**
+- Features like `text_length` or `image_brightness` are easily manipulated by attackers to evade detection. Prefer robust, semantic features over fragile metadata.
+
+---
+
+## 7. Business & Strategic Implications
+
+- **Interpretability as a Feature:** In regulated industries (Finance, Health), a Linear Regression model with 5 clear features is often superior to a Neural Network with 99% accuracy but zero explainability. You cannot explain a "Black Box" to a loan applicant.
+- **Cost of Features:** Every column in your table has a "Tax." It costs storage, compute, and maintenance. "Feature Selection" is cost optimization. If a feature adds 0.01% accuracy but requires a new API integration, kill it.
+
+---
+
+## 8. Common Pitfalls & Misconceptions
+
+- **Imputing with Mean (Blindly):** Filling missing values with the `mean` reduces variance and can distort correlations. Consider `KNNImputer` (imputing based on similar rows) or treating `Missing` as a separate category (if the missingness is informative).
+- **One-Hot Encoding Everything:** Doing this on a categorical column with 10,000 unique values creates the "Curse of Dimensionality," making distance metrics useless. Use "Target Encoding" or "Embeddings" instead.
+- **The "ID" Column:** accidentally leaving `User_ID` in the training set. The model might memorize that `User_ID=452` always churns. This is overfitting, not learning.
+
+---
+
+## 9. Required Trade-offs (Explicitly Resolved)
+
+**Complexity vs. Interpretability**
+
+- _The Conflict:_ Principal Component Analysis (PCA) can reduce 50 features to 5 "Principal Components" that capture 95% of the variance. This helps model performance. However, "Component 1" is a math abstraction, not a real-world concept.
+- _The Resolution:_
+- **High-Stakes (Credit/Medical):** **Interpretability Wins.** Use raw features or simple interactions (Ratio of Debt/Income). Avoid PCA.
+- **Low-Stakes (Image/RecSys):** **Complexity Wins.** Use Embeddings/PCA. Accuracy matters more than knowing why a specific pixel was selected.
+
+---
+
+## 10. Next Steps
+
+**Immediate Action:**
+
+1. Review your current project's feature list.
+2. Ask for every feature: _"Is this available at inference time?"_
+3. Check Feature Importance. If one feature has >50% importance, investigate it for leakage.
+
+**Coming Up Next:**
+Day 8 covers **Model Training & Evaluation Standards**. We have clean features (Day 7). How do we pick the right metric? Why is Accuracy usually the wrong metric? We will dive into Precision, Recall, and Calibration.
+
+---
+
+## 11. Further Reading
+
+- **Classic Paper:** [Leakage in Data Mining: Formulation, Detection, and Avoidance](https://www.google.com/search?q=https://www.cs.umb.edu/~ding/history/470_670_fall_2011/papers/cs670_Tran_Leakage_in_Data_Mining.pdf) (KDD).
+- **Tooling:** [Scikit-Learn Preprocessing Guide](https://scikit-learn.org/stable/modules/preprocessing.html).
+- **Ethics:** [Fairness and Machine Learning - Chapter on Features](https://fairmlbook.org/).

@@ -138,15 +138,48 @@ export default function Home() {
             </tr>
             <tr>
               <td className="font-mono text-secondary">005</td>
-              <td>Model Versioning Strategies</td>
-              <td>Deployment Confusion</td>
-              <td><LensTag>Production</LensTag></td>
+              <td>Experiment Tracking & The &apos;Zombie Model&apos; Problem</td>
+              <td>Zombie Models</td>
+              <td><LensTag>Reproducibility</LensTag></td>
             </tr>
              <tr>
               <td className="font-mono text-secondary">006</td>
-              <td>Automated Bias Detection Triggers</td>
-              <td>Discriminatory Output</td>
+              <td>Exploratory Data Analysis (EDA) & Profiling</td>
+              <td>Digital Redlining</td>
               <td><LensTag>Safety</LensTag></td>
+            </tr>
+            <tr>
+              <td className="font-mono text-secondary">007</td>
+              <td>Feature Engineering & Selection</td>
+              <td>Data Leakage</td>
+              <td><LensTag>Reproducibility</LensTag></td>
+            </tr>
+            <tr>
+              <td className="font-mono text-secondary">008</td>
+              <td>Baseline Models & Benchmarking</td>
+              <td>Complexity Tax</td>
+              <td><LensTag>Governance</LensTag></td>
+            </tr>
+             <tr>
+              <td className="font-mono text-secondary">009</td>
+              <td>Evaluation Metrics for Business</td>
+              <td>Metric Misalignment</td>
+              <td><LensTag>Production</LensTag></td>
+            </tr>
+            <tr>
+              <td className="font-mono text-secondary">010</td>
+              <td>Model Validation Strategies</td>
+              <td>Temporal Leakage</td>
+              <td><LensTag>Security</LensTag></td>
+            </tr>
+            <tr>
+              <td colSpan={4} style={{ textAlign: 'center', padding: '1.5rem 0', border: 'none' }}>
+                <Link href="/days">
+                  <button className={styles.btnPrimary}>
+                    See More
+                  </button>
+                </Link>
+              </td>
             </tr>
           </tbody>
         </table>

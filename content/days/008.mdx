@@ -1,0 +1,214 @@
+---
+title: "Baseline Models & Benchmarking"
+subtitle: "The ROI of Complexity & The 'Zero-Rule'"
+day: "008"
+tags: ["Governance", "Benchmarking", "Sustainability"]
+---
+
+## 1. Why This Topic Matters
+
+**The Failure Mode:** A team spends three months fine-tuning a BERT-based transformer for a sentiment analysis task. They achieve 89% accuracy. During the deployment review, a senior engineer writes five lines of code using a Naive Bayes classifier (1950s technology) and achieves 88.5% accuracy.
+
+**The Cause:** **Resume-Driven Development.** Engineers often jump immediately to the most complex architecture ("State of the Art") because it’s exciting, skipping the fundamental step of establishing a baseline.
+
+**The Leadership Reality:**
+
+- **The Complexity Tax:** Complex models are harder to debug, slower to infer, and expensive to host.
+- **Opportunity Cost:** The 3 months spent gaining that 0.5% accuracy cost $100,000 in engineering time. Was that 0.5% worth $100k?
+- **Defensibility:** If you cannot prove your deep learning model beats a linear regression significantly, you cannot justify the cloud bill to the CFO.
+
+**System-Wide Implication:** A baseline is not just a comparison point; it is the **viability threshold**. If you can't beat the baseline, you don't have a product.
+
+---
+
+## 2. Core Concepts & Mental Models
+
+### The Complexity Ladder
+
+Always climb the ladder one rung at a time. Never jump to the top.
+
+1. **Rung 0 (Heuristic/Dummy):** "Always predict the majority class" or "Predict the average value."
+2. **Rung 1 (Linear/Simple):** Logistic Regression, Naive Bayes. (Highly interpretable, fast).
+3. **Rung 2 (Ensemble/Non-Linear):** Random Forest, XGBoost. (Good performance, moderate complexity).
+4. **Rung 3 (Deep Learning):** Neural Networks. (Black box, expensive, data-hungry).
+
+**Rule:** You only ascend a rung if the ROI (Performance Gain / Cost) is positive.
+
+### The "Zero-Rule" (ZeroR)
+
+This is the absolute floor.
+
+- **Classification:** Always predict the class that appears most often (e.g., "Not Fraud").
+- **Regression:** Always predict the mean/median of the training set.
+- _Insight:_ If your fancy model gets 95% accuracy on a fraud dataset where 95% of transactions are legit, your model has **zero skill**. It is tied with the Zero-Rule.
+
+---
+
+## 3. Theoretical Foundations
+
+**Occam's Razor in ML:**
+"Entities should not be multiplied beyond necessity."
+Mathematically, this is formalized in **Regularization** (e.g., L1/L2 penalties), which punishes complex coefficients. A simpler model that generalizes well is statistically superior to a complex model that overfits.
+
+**The Law of Diminishing Returns:**
+Model performance follows a logarithmic curve relative to complexity and data. The first simple features yield 80% of the value. The last 1% requires exponential effort.
+
+---
+
+## 4. Production-Grade Implementation
+
+### The Scikit-Learn `DummyClassifier`
+
+Never write your own baseline logic if you don't have to. Scikit-learn provides a standard implementation that should be part of _every_ pipeline.
+
+```python
+from sklearn.dummy import DummyClassifier
+
+# Strategy 'most_frequent': Always predicts the majority class
+baseline = DummyClassifier(strategy="most_frequent")
+baseline.fit(X_train, y_train)
+baseline_score = baseline.score(X_test, y_test)
+```
+
+### Benchmarking Human-Level Performance (HLP)
+
+Before you target 100% accuracy, ask: "What is the human error rate?"
+
+- If humans only agree on the label 95% of the time (e.g., medical diagnosis from X-rays), a model achieving 96% is likely overfitting to noise or bad labels.
+- **Benchmark:** Baseline < Simple Model < HLP < Bayes Optimal Error.
+
+---
+
+## 5. Hands-On Project: The "Sanity Check"
+
+**Objective:** We will tackle an imbalanced dataset where "Accuracy" is a liar. We will start with a Dummy baseline, then beat it with a simple Logistic Regression, proving the value of the model.
+
+**Constraints:**
+
+- Dataset: Synthetic Imbalanced Classification (90% Class 0, 10% Class 1).
+- Metric: F1 Score (Accuracy is forbidden as the primary metric).
+
+### Step 1: Generate Imbalanced Data
+
+```python
+import numpy as np
+import pandas as pd
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+from sklearn.dummy import DummyClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import classification_report, f1_score
+
+# Reproducibility
+np.random.seed(42)
+
+# Generate 1000 samples, 90% are Class 0 (Benign), 10% are Class 1 (Target)
+X, y = make_classification(
+    n_samples=1000,
+    n_features=20,
+    weights=[0.90],
+    random_state=42
+)
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, random_state=42)
+```
+
+### Step 2: Rung 0 - The Dummy (Zero-Rule)
+
+```python
+# The "Do Nothing" Model
+dummy = DummyClassifier(strategy="most_frequent")
+dummy.fit(X_train, y_train)
+dummy_preds = dummy.predict(X_test)
+
+# Evaluate
+print("--- Baseline (Dummy) ---")
+# Accuracy will be high (~90%)
+print(f"Accuracy: {dummy.score(X_test, y_test):.4f}")
+# F1 will be 0.0 because it never predicts the minority class
+print(f"F1 Score: {f1_score(y_test, dummy_preds):.4f}")
+```
+
+### Step 3: Rung 1 - The Simple Model (Logistic Regression)
+
+```python
+# The "Simplest Useful" Model
+log_reg = LogisticRegression(class_weight='balanced', random_state=42)
+log_reg.fit(X_train, y_train)
+lr_preds = log_reg.predict(X_test)
+
+print("\n--- Logistic Regression ---")
+print(f"Accuracy: {log_reg.score(X_test, y_test):.4f}")
+print(f"F1 Score: {f1_score(y_test, lr_preds):.4f}")
+```
+
+### Step 4: Analysis (The Decision)
+
+- _Dummy:_ Accuracy 0.90, F1 0.00.
+- _LogReg:_ Accuracy 0.88, F1 0.65 (Hypothetical).
+
+**Conclusion:** The Logistic Regression has lower accuracy than the Dummy but infinitely higher utility (F1). We have beaten the baseline. Now, and only now, are we allowed to try a Random Forest.
+
+---
+
+## 6. Ethical, Security & Safety Considerations
+
+- **Sustainability (Green AI):**
+- Training a large Transformer model can emit as much CO2 as five cars in their lifetimes.
+- A Logistic Regression trains in seconds on a CPU.
+- _Responsibility:_ If the Simple Model achieves 98% of the Complex Model's performance, using the Complex Model is an environmentally irresponsible choice.
+
+- **Explainability:** Simple models (Linear/Trees) are transparent. You can explain exactly why a loan was denied ("Debt-to-Income coefficient was -2.5"). Deep Learning requires complex post-hoc analysis (SHAP/LIME) which are approximations. In regulated domains, simplicity is a safety feature.
+
+---
+
+## 7. Business & Strategic Implications
+
+- **Inference Costs:**
+- Linear Regression: < 1ms, runs on cheap CPU.
+- Deep Learning: 100ms+, requires GPU instances.
+- _Impact:_ At 1M requests/day, the deep model could cost $5,000/month vs $50/month for the linear one.
+
+- **Time to Market:** A baseline can be deployed in Day 1. It starts gathering data immediately. A SOTA model takes weeks. Deploy the baseline _first_ to validate the pipeline (Day 5 & 6), then iterate.
+
+---
+
+## 8. Common Pitfalls & Misconceptions
+
+- **Comparing Accuracies on Imbalanced Data:** As demonstrated, 99% accuracy is meaningless if the prevalence is 1%. Always use specific metrics (Precision/Recall/F1/AUC) for benchmarking.
+- **"We'll optimize later":** Teams assume they can swap the model easily. If you build your infrastructure around a GPU-heavy container (Day 3), downgrading to a CPU model might actually require infrastructure refactoring. Start simple.
+- **Ignoring the "Rule-Based" Baseline:** Sometimes a simple `if` statement beats ML.
+- _Example:_ "If transaction > $10,000 and location != home, flag it." This heuristic might catch 80% of fraud with $0 training cost.
+
+---
+
+## 9. Required Trade-offs (Explicitly Resolved)
+
+**Sophistication vs. ROI**
+
+- **The Conflict:** Data Scientists want to use the latest paper from NeurIPS. Product Managers want feature release tomorrow.
+- **The Resolution:** We implement **"Champion/Challenger"**.
+- The **Champion** is the current best model in production (starts as Baseline).
+- The **Challenger** is the new complex model.
+- The Challenger only replaces the Champion if `(Value_Add - Cost_Increase) > Threshold`.
+
+---
+
+## 10. Next Steps
+
+**Immediate Action:**
+
+1. Take your current project.
+2. Run a `DummyClassifier` on it.
+3. Record the score. If your current model is not significantly beating this score, stop optimizing hyperparameters and go back to Feature Engineering (Day 7).
+
+**Coming Up Next:**
+Day 9 tackles **Evaluation Metrics Deep Dive**. We touched on F1 vs Accuracy today. Tomorrow, we dissect the Confusion Matrix, ROC curves, and Calibration Plots to understand _how_ the model fails, not just _if_ it fails.
+
+---
+
+## 11. Further Reading
+
+- **Must Read:** [Rules of Machine Learning: Best Practices for ML Engineering](https://developers.google.com/machine-learning/guides/rules-of-ml) (Google) - Rule #1: Don't be afraid to launch a product without machine learning.
+- **Sustainability:** [Green AI](https://arxiv.org/abs/1907.10597) (Schwartz et al.) - The seminal paper on the cost of complexity.
+- **Scikit-Learn:** [DummyClassifier Documentation](https://scikit-learn.org/stable/modules/generated/sklearn.dummy.DummyClassifier.html).
