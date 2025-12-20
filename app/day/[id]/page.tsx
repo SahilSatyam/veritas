@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 import React from 'react';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import remarkGfm from 'remark-gfm';
 import 'katex/dist/katex.min.css';
 
 import CodeBlock from "../../components/CodeBlock";
@@ -69,7 +70,7 @@ export default async function DayPage({ params }: { params: Promise<{ id: string
                 components={components} 
                 options={{
                   mdxOptions: {
-                    remarkPlugins: [remarkMath],
+                    remarkPlugins: [remarkMath, remarkGfm],
                     rehypePlugins: [rehypeKatex],
                   }
                 }}
