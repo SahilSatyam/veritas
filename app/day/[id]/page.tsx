@@ -85,7 +85,7 @@ export async function generateMetadata(
 export default async function DayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  if (id !== "001") {
+  if (id !== "001" && id !== "002") {
     return (
       <div className="container">
         <div style={{ 
