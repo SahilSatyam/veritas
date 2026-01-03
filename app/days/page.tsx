@@ -13,6 +13,8 @@ export default function IndexPage() {
 
   const lenses = ["All", "Reproducibility", "Safety", "Governance", "Production", "Security"];
 
+  const completedDays = days.filter(d => d.status === "done").length;
+
   return (
     <div className="container">
       <div className={styles.header}>
@@ -25,10 +27,10 @@ export default function IndexPage() {
       <div className={styles.progressSection}>
         <div className={styles.progressLabel}>
           <span>Series Progress</span>
-          <span>Day 20 of 100</span>
+          <span>Day {completedDays} of 100</span>
         </div>
         <div className={styles.progressBar}>
-          <div className={styles.progressFill} style={{ width: '20%' }}></div>
+          <div className={styles.progressFill} style={{ width: `${completedDays}%` }}></div>
           {/* Mock visual segments if needed, but simple bar is clean */}
         </div>
       </div>

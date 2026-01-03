@@ -1,0 +1,175 @@
+---
+title: "The LLM API Landscape (OpenAI, Anthropic, Mistral)"
+subtitle: "Vendor Lock-in"
+day: "021"
+tags: ["Architecture", "API Design", "Strategy"]
+date: "2026-01-21"
+---
+
+### Abstract
+
+Systems tightly coupled to a single LLM provider (e.g., hardcoded calls to `gpt-5.2-instant`) create existential business risk. When a vendor changes pricing, deprecates models, or alters data retention policies—as OpenAI did during the "Code Red" of Dec '25—an entangled codebase transforms a strategic pivot into a multi-month refactor. This post establishes the architectural pattern for a **Model-Agnostic Gateway**, creating a control plane that decouples your business logic from vendor APIs.
+
+---
+
+### 1. Why This Topic Matters
+
+In traditional software, switching databases is painful but rare. In AI engineering, switching models is a weekly necessity.
+
+The leaderboard changes too fast. In Q3 2025, Sonnet 3.5 was the coding leader. By November, **Claude Opus 4.5** took the crown. Two weeks later, **GPT-5.2** launched with "Instant" and "Thinking" variants. If your codebase is littered with vendor-specific SDK calls, you are structurally unable to take advantage of these shifts.
+
+**The Failure Mode:** You are paying premium rates for "Legacy" models (like GPT-4o) while competitors pay less for superior performance using the latest "Hybrid Reasoning" APIs.
+
+### 2. Core Concepts & Mental Models
+
+#### The Provider Abstraction Layer (PAL)
+
+Do not use vendor SDKs directly in your application logic. Instead, treat LLM providers as interchangeable compute backends.
+
+- **The "Thinking" vs. "Effort" Divergence:**
+- **OpenAI** now separates models by _mode_ (`gpt-5.2-instant` vs `gpt-5.2-thinking`).
+- **Anthropic** uses a single model (`claude-opus-4.5`) but exposes an `effort` parameter (low/med/high) to control reasoning depth.
+- _Your abstraction must normalize these disparate concepts into a single "Intelligence" config._
+
+- **Token Normalization:** A "token" is still not a standard unit. Rate limiters (RPM) must account for the fact that Opus 4.5 is significantly more verbose than GPT-5.2 Instant.
+
+### 3. Required Trade-offs to Surface
+
+| Trade-off                | GPT-5.2 (OpenAI)                                                                                                | Claude Opus 4.5 (Anthropic)                                                                                | Mistral Large 3                                                                              |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| **Intelligence Profile** | **Split Personality.** You must choose between `Instant` (fast, ~150 t/s) or `Thinking` (slow, high-reasoning). | **Elastic Intelligence.** Single model. You tune the `effort` parameter (1-10) to trade latency for depth. | **Specialist.** Remains the leader for EU-sovereign tasks and fine-tuning on your own infra. |
+| **Context & Retrieval**  | 128k. Strong on "needle-in-haystack" but struggles with massive multi-file coding tasks compared to Opus.       | 500k. The "Context King." Can ingest entire repos (~200 files) with higher recall than GPT.                | 32k - 128k.                                                                                  |
+| **Pricing Strategy**     | Tiered by model. `Instant` is cheap; `Thinking` is expensive ($30/1M output).                                   | Tiered by _effort_. High effort queries cost 5x more than low effort ones.                                 | Flat rate.                                                                                   |
+
+**Decision Framework:**
+
+- Use **GPT-5.2 Instant** for latency-sensitive, user-facing features (chatbots, UI gen).
+- Use **Claude Opus 4.5 (High Effort)** for background agents, complex refactoring, and asynchronous "Deep Work."
+- Use **Mistral** if data cannot leave your VPC (using the self-hosted weights).
+
+### 4. Responsibility Lens: Governance & Data Retention
+
+The most critical non-functional requirement is **Data Privacy**.
+
+- **OpenAI:** Default retention is 30 days. _Zero Data Retention (ZDR)_ is strictly for Enterprise. Note: The new "Thinking" models store "thought traces" differently than final outputs—verify your BAA covers the _thought process_ logs, not just the final answer.
+- **Anthropic:** Commercial data is not trained on. However, the `effort` parameter logs are retained for 30 days for safety monitoring unless you have the "Hyperscale" agreement.
+
+### 5. Hands-On Project: The "Reasoning-Agnostic" Gateway
+
+We will build a wrapper that normalizes the new **2026 paradigm**: converting a generic "Reasoning Level" config into the specific vendor implementation (OpenAI's _models_ vs. Anthropic's _parameters_).
+
+**Scenario:** You want to ask for a "High Reasoning" code review. The system should be able to route this to either `GPT-5.2-Thinking` or `Claude-Opus-4.5 (Effort=High)` seamlessly.
+
+#### The Code Structure
+
+```python
+import os
+from abc import ABC, abstractmethod
+from typing import Dict, Any, Literal
+import requests
+
+# 1. Define the Abstract Strategy
+class LLMProvider(ABC):
+    @abstractmethod
+    def generate(self, system_prompt: str, user_prompt: str, reasoning_level: Literal["low", "high"]) -> str:
+        pass
+
+# 2. Implement OpenAI Strategy (Model Swapping)
+class OpenAIProvider(LLMProvider):
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.url = "https://api.openai.com/v1/chat/completions"
+
+    def generate(self, system_prompt: str, user_prompt: str, reasoning_level: str) -> str:
+        # OpenAI handles reasoning via distinct model IDs
+        model_map = {
+            "low": "gpt-5.2-instant",
+            "high": "gpt-5.2-thinking"  # The new reasoning flagship
+        }
+
+        payload = {
+            "model": model_map.get(reasoning_level, "gpt-5.2-instant"),
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+        }
+        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+
+        response = requests.post(self.url, json=payload, headers=headers)
+        response.raise_for_status()
+        return response.json()['choices'][0]['message']['content']
+
+# 3. Implement Anthropic Strategy (Parameter Tuning)
+class AnthropicProvider(LLMProvider):
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.url = "https://api.anthropic.com/v1/messages"
+
+    def generate(self, system_prompt: str, user_prompt: str, reasoning_level: str) -> str:
+        # Anthropic handles reasoning via the 'effort' parameter (Post-Opus 4.5 update)
+        effort_map = {
+            "low": "low",    # Standard latency
+            "high": "high"   # Activates 'Chain of Thought' equivalent
+        }
+
+        payload = {
+            "model": "claude-opus-4.5",
+            "system": system_prompt,
+            "messages": [{"role": "user", "content": user_prompt}],
+            "effort": effort_map.get(reasoning_level, "medium"), # The new 2026 parameter
+            "max_tokens": 4096
+        }
+
+        headers = {
+            "x-api-key": self.api_key,
+            "anthropic-version": "2023-06-01", # Version header remains stable
+            "Content-Type": "application/json"
+        }
+
+        response = requests.post(self.url, json=payload, headers=headers)
+        response.raise_for_status()
+        return response.json()['content'][0]['text']
+
+# 4. The Gateway
+class LLMGateway:
+    def __init__(self):
+        self._providers = {
+            "openai": OpenAIProvider(os.getenv("OPENAI_API_KEY")),
+            "anthropic": AnthropicProvider(os.getenv("ANTHROPIC_API_KEY"))
+        }
+
+    def chat(self, provider_name: str, reasoning_level: str, user_prompt: str) -> str:
+        if provider_name not in self._providers:
+            raise ValueError(f"Provider {provider_name} not supported.")
+
+        print(f"[AUDIT] Routing to {provider_name} with Reasoning={reasoning_level}")
+        return self._providers[provider_name].generate(
+            "You are a Senior Engineer.",
+            user_prompt,
+            reasoning_level
+        )
+
+```
+
+### 6. Ethical, Security & Safety Considerations
+
+- **The "Thinking" Exposure Risk:** GPT-5.2 Thinking models sometimes output their "internal monologue" in the API response (if not filtered correctly). You **must** sanitize the output to ensure the model didn't "think" about PII or sensitive internal logic before giving the final answer.
+- **Prompt Injection in Hybrid Models:** "High Effort" settings in Claude are harder to jailbreak because the model "thinks" about the safety implications before answering. "Instant" models are more susceptible. Do not assume safety parity across reasoning levels.
+
+### 7. Strategic Business Implications
+
+- **The "Effort" Bill:** With Anthropic's new pricing, a "High Effort" query costs 5x more. If you default your gateway to `reasoning_level="high"` for simple "Hello World" chats, you will bankrupt your department. Implement **Complexity Routing** to downgrade easy queries automatically.
+- **Availability Zones:** During the Dec '25 outages, Azure OpenAI went down, but Anthropic on GCP stayed up. This multi-provider gateway is your primary disaster recovery plan.
+
+### 8. Common Pitfalls
+
+- **Hardcoding `gpt-4`:** A surprising number of 2026 startups still have `model="gpt-4"` hardcoded. This model is now legacy/deprecated and costs more for worse performance than `gpt-5.2-instant`.
+- **Ignoring the `effort` Timeout:** Claude Opus 4.5 on "High Effort" can take 45+ seconds to reply. Standard HTTP timeouts (usually 30s) will kill the connection before the answer arrives. Bump your timeouts to 90s for reasoning models.
+
+### 9. Next Steps
+
+1. **Refactor:** Replace direct `openai` calls with the `LLMGateway` class above.
+2. **Config:** Set your default `reasoning_level` to "low" to protect budget.
+3. **Sanitize:** Add a regex check to ensure no `<thought_trace>` tags leak into your UI from the new OpenAI models.
+4. Prepare for **Day 22: Prompt Engineering I: Structure & Context**.
