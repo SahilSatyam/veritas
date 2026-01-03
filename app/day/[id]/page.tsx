@@ -82,10 +82,12 @@ export async function generateMetadata(
   }
 }
 
+import { isDayUnlocked } from "../../../lib/days-registry";
+
 export default async function DayPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  if (id !== "001" && id !== "002") {
+  if (!isDayUnlocked(id)) {
     return (
       <div className="container">
         <div style={{ 
