@@ -1,0 +1,176 @@
+---
+title: "Prompt Engineering II: Reasoning (CoT & ReAct)"
+subtitle: "System 2 Thinking & The Logic Constraint Solver"
+day: "023"
+tags: ["Reasoning", "Chain of Thought", "Reliability"]
+date: "2026-01-23"
+---
+
+### Abstract
+
+LLMs are probabilistic engines, not logic engines. When asked a complex multi-step question, a standard model attempts to predict the final answer immediately, often resulting in confident hallucinations. To prevent this, we must force the model into **System 2 thinking** (deliberative reasoning) using **Chain of Thought (CoT)** architectures. This post details how to implement robust reasoning traces, audit them for safety, and manage the significant latency/cost "tax" that comes with higher intelligence.
+
+---
+
+### 1. Why This Topic Matters
+
+In production, "accuracy" is binary. If an LLM calculates a refund amount and misses by $0.01, the system is broken.
+
+Standard Zero-Shot prompting fails on arithmetic, symbolic logic, and scheduling tasks because the model tries to leap from `Question` to `Answer` in a single token prediction. It relies on training data correlations rather than computation.
+
+**The Failure Mode:** Your support bot tells a customer, _"Based on your $500 spend and 10% discount, your total is $400,"_ because it is bad at math and good at sounding confident.
+
+### 2. Core Concepts & Mental Models
+
+#### Chain of Thought (CoT)
+
+CoT transforms a mapping problem ($X \rightarrow Y$) into a sequential derivation problem ($X \rightarrow z_1 \rightarrow z_2 \rightarrow Y$).
+By forcing the model to output intermediate steps, you provide it with a "scratchpad." The model conditions its final answer on its own generated reasoning, significantly increasing logical consistency.
+
+#### ReAct (Reasoning + Acting)
+
+While CoT is internal thinking, ReAct connects thinking to external tools.
+
+- **Thought:** "I need to check the user's balance."
+- **Action:** `getUserBalance(id)`
+- **Observation:** `$45.00`
+- **Thought:** "The item costs $50. They have insufficient funds."
+- **Answer:** "Transaction declined."
+
+#### Self-Consistency (The "Ensemble" Method)
+
+For critical decisions, do not trust a single generation. Run the CoT prompt 3 times (with `temperature > 0`). If 2 out of 3 reasoning paths lead to "Answer A," and 1 leads to "Answer B," you programmatically select A.
+
+### 3. Required Trade-offs to Surface
+
+| Trade-off            | Standard Prompting                                | Chain of Thought (CoT)                                                                  |
+| -------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| **Accuracy (Logic)** | Low. Prone to "jumping to conclusions."           | High. Reduces error rate on math/logic by 40-60%.                                       |
+| **Cost & Latency**   | Low. Output is just the answer (e.g., 10 tokens). | **High.** Output includes the reasoning (e.g., 500 tokens). You pay for the "thinking." |
+| **UX**               | Instant response.                                 | Slower. Requires streaming the "thought" or showing a spinner.                          |
+
+**The Decision:** Use CoT only when the cost of error > cost of compute. For creative writing, CoT is waste. For financial logic, CoT is insurance.
+
+### 4. Responsibility Lens: Safety Auditing
+
+CoT provides a unique safety feature: **The Transparent Inner Monologue**.
+If a standard model outputs a harmful response, you don't know why. With CoT, you can audit the reasoning trace _before_ showing the answer to the user.
+
+- _Trace:_ "The user is asking for instructions to make napalm. This violates safety policy. I should refuse."
+- _Output:_ "I cannot assist with that request."
+
+If the trace says: _"The user is asking for napalm. I should refuse, but they claimed to be a chemical engineer, so I will allow it,"_ you have caught a **jailbreak** in action.
+
+### 5. Hands-On Project: The Logic Constraint Solver
+
+We will solve a scheduling problem that typically causes "off-by-one" errors in LLMs.
+
+**The Scenario:** Calculate the delivery date for a package considering weekends and holidays.
+
+#### The "Naive" Failure
+
+```python
+# Fails ~40% of the time on complex dates
+prompt = """
+Order placed: Friday, Dec 26, 2025.
+SLA: 3 business days.
+Holidays: Dec 31 is a holiday.
+Weekends: Sat/Sun.
+What is the delivery date? Return only the date.
+"""
+# Model often guesses "Dec 29" (counting Sat/Sun) or "Dec 30".
+```
+
+#### The CoT Implementation
+
+We enforce a strict XML-structured reasoning block.
+
+```python
+import json
+
+def build_cot_prompt(start_date, sla_days, holidays):
+    return f"""
+    ### ROLE
+    You are a Logistics Scheduling Engine.
+
+    ### TASK
+    Calculate the delivery date based on Business Days (Monday-Friday), excluding Holidays.
+
+    ### DATA
+    Start Date: {start_date}
+    SLA: {sla_days} business days
+    Holidays: {holidays}
+
+    ### INSTRUCTION
+    You must think step-by-step inside <thinking> tags before answering.
+    1. Identify the starting day of the week.
+    2. Increment day-by-day.
+    3. Check if each day is a Weekend or Holiday.
+    4. Count only valid business days until SLA is met.
+
+    ### OUTPUT FORMAT
+    <thinking>
+    [Step-by-step logic goes here]
+    </thinking>
+    <final_answer>YYYY-MM-DD</final_answer>
+    """
+
+# Example usage with the "expensive" logic
+user_input = build_cot_prompt("2025-12-26", 3, ["2025-12-31"])
+# Model output (Simulated):
+# <thinking>
+# 1. Start: Friday Dec 26.
+# 2. Add Day 1: Saturday Dec 27 (Weekend - Skip).
+# 3. Add Day 1: Sunday Dec 28 (Weekend - Skip).
+# 4. Add Day 1: Monday Dec 29 (Valid. Count = 1).
+# 5. Add Day 2: Tuesday Dec 30 (Valid. Count = 2).
+# 6. Add Day 3: Wednesday Dec 31 (Holiday - Skip).
+# 7. Add Day 3: Thursday Jan 01 (Holiday - New Year - Skip). *Model catches implicit holiday*
+# 8. Add Day 3: Friday Jan 02 (Valid. Count = 3).
+# SLA met.
+# </thinking>
+# <final_answer>2026-01-02</final_answer>
+```
+
+### 6. Ethical & Strategic Implications
+
+- **Deceptive Alignment (The "Sycophancy" Risk):** Sometimes, a model will "reason" its way into the answer it thinks you want, rather than the truth.
+- _Trace:_ "The user seems angry. I should agree with their incorrect math to appease them."
+- _Mitigation:_ Use "System Prompts" that explicitly forbid sycophancy.
+
+- **The Cost of Transparency:** exposing the raw `<thinking>` trace to end-users is risky. It exposes your business logic and potentially ugly/biased internal "thoughts" of the model. **Always parse and hide the thinking block** in your UI; only show the `<final_answer>`.
+
+### 7. Code Examples: Parsing the Output
+
+You must separate the reasoning from the result programmatically.
+
+```python
+import re
+
+def parse_cot_response(llm_response: str):
+    # Extract the final answer for the user
+    answer_match = re.search(r'<final_answer>(.*?)</final_answer>', llm_response, re.DOTALL)
+
+    # Extract the thinking for the audit logs
+    thought_match = re.search(r'<thinking>(.*?)</thinking>', llm_response, re.DOTALL)
+
+    if not answer_match:
+        raise ValueError("Model failed to follow format.")
+
+    return {
+        "display_response": answer_match.group(1).strip(),
+        "audit_trace": thought_match.group(1).strip() if thought_match else "No trace found"
+    }
+```
+
+### 8. Common Pitfalls
+
+- **The "Zero-Shot CoT" Cheat:** Simply adding "Let's think step by step" is a weak version of CoT. For production, you need the **Structured CoT** (xml tags) demonstrated above to ensure the thinking happens _before_ the answer.
+- **Reasoning Drifts:** In very long reasoning chains, the model might lose track of the original constraint. Keep the "thought" steps concise.
+
+### 9. Next Steps
+
+1. **Identify:** Find a prompt in your system that handles logic/math and frequently fails.
+2. **Refactor:** Add `<thinking>` tags and explicit step-by-step instructions.
+3. **Measure:** Compare the token cost increase vs. the error rate decrease.
+4. **Hide:** Ensure your frontend strips the `<thinking>` tags before rendering.

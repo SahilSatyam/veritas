@@ -32,6 +32,7 @@ export const daysRegistry: DayRegistryItem[] = [
   { id: "020", title: "Phase 1 Capstone: The 'End-to-End' Production Pipeline", failure: "Integration Hell (Fragmented Architecture)", lens: "Reproducibility", domain: "Orchestration", status: "locked" },
   { id: "021", title: "The LLM API Landscape (OpenAI, Anthropic, Mistral)", failure: "Vendor Lock-in", lens: "Governance", domain: "MLOps", status: "locked" },
   { id: "022", title: "Prompt Engineering I: Structure & Context", failure: "Garbage In, Garbage Out (Ambiguity)", lens: "Human Factors", domain: "MLOps", status: "locked" },
+  { id: "023", title: "Prompt Engineering II: Reasoning (CoT & ReAct)", failure: "Logic Hallucination", lens: "Safety", domain: "LLMs", status: "locked" },
 ];
 
 export function isDayUnlocked(id: string): boolean {
