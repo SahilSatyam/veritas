@@ -13,7 +13,7 @@ export const daysRegistry: DayRegistryItem[] = [
   { id: "001", title: "The Sanctity of the Environment", failure: "Dependency Hell", lens: "Reproducibility", domain: "MLOps", status: "done" },
   { id: "002", title: "Version Control for Data & Code", failure: "Silent Drift", lens: "Reproducibility", domain: "Data Infra", status: "done" },
   { id: "003", title: "Containerization Basics (Docker)", failure: "Environment Skew", lens: "Production", domain: "Infra", status: "done" },
-  { id: "004", title: "Unit Testing for Data Science", failure: "Silent Logic Failure", lens: "Safety", domain: "QA", status: "locked" },
+  { id: "004", title: "Unit Testing for Data Science", failure: "Silent Logic Failure", lens: "Safety", domain: "QA", status: "done" },
   { id: "005", title: "Experiment Tracking & The 'Zombie Model' Problem", failure: "Zombie Models", lens: "Reproducibility", domain: "MLOps", status: "locked" },
   { id: "006", title: "Exploratory Data Analysis (EDA) & Profiling", failure: "Digital Redlining", lens: "Safety", domain: "Data Science", status: "locked" },
   { id: "007", title: "Feature Engineering & Selection", failure: "Data Leakage", lens: "Reproducibility", domain: "Data Science", status: "locked" },
