@@ -21,8 +21,8 @@ export default function AuditLogPage() {
                 <AlertCircle size={16} /> Latest Event: Content Release
               </div>
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                Jan 04, 2026: Released &quot;Unit Testing for Data Science&quot;. 
-                Addressed silent logic failures via comprehensive unit testing strategies.
+                Jan 05, 2026: Released &quot;Experiment Tracking & The &apos;Zombie Model&apos; Problem&quot;. 
+                Addressed zombie models via experiment tracking.
               </p>
             </div>
             
@@ -36,6 +36,12 @@ export default function AuditLogPage() {
                     </tr>
                 </thead>
                 <tbody>
+                    <tr>
+                        <td>2026-01-05</td>
+                        <td><span className={styles.tag}>CONTENT</span></td>
+                        <td>Release Day 005</td>
+                        <td className="font-mono text-micro">f1a8...7b22</td>
+                    </tr>
                     <tr>
                         <td>2026-01-04</td>
                         <td><span className={styles.tag}>CONTENT</span></td>
