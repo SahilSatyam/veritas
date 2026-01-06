@@ -21,8 +21,8 @@ export default function AuditLogPage() {
                 <AlertCircle size={16} /> Latest Event: Content Release
               </div>
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                Jan 05, 2026: Released &quot;Experiment Tracking & The &apos;Zombie Model&apos; Problem&quot;. 
-                Addressed zombie models via experiment tracking.
+                Jan 06, 2026: Released &quot;Exploratory Data Analysis (EDA) & Profiling&quot;. 
+                Focused on preventing Digital Redlining via advanced profiling techniques.
               </p>
             </div>
             
@@ -36,6 +36,12 @@ export default function AuditLogPage() {
                     </tr>
                 </thead>
                 <tbody>
+                    <tr>
+                        <td>2026-01-06</td>
+                        <td><span className={styles.tag}>CONTENT</span></td>
+                        <td>Release Day 006</td>
+                        <td className="font-mono text-micro">d3a9...5c77</td>
+                    </tr>
                     <tr>
                         <td>2026-01-05</td>
                         <td><span className={styles.tag}>CONTENT</span></td>
