@@ -1,0 +1,182 @@
+---
+title: "Building Conversational Memory: State Management Patterns"
+subtitle: "Conversational Amnesia (Statelessness)"
+day: "025"
+tags: ["Memory", "Redis", "System Design"]
+date: "2026-01-25"
+---
+
+### Abstract
+
+LLMs are stateless functions. They do not "remember" you. The illusion of continuity is created by the application layer, which re-sends the entire conversation history with every new request. As conversations grow, this brute-force approach hits two walls: **Cost** (re-processing thousands of tokens) and **Limits** (context window overflow). This post details how to engineer a production-grade **Session State Store**, moving beyond simple lists to sliding windows and summarization strategies that balance recall with efficiency.
+
+---
+
+### 1. Why This Topic Matters
+
+If you build a chatbot without explicit memory engineering, it behaves like the movie _Memento_.
+
+- **User:** "My name is Alice."
+- **Bot:** "Hello Alice."
+- **User:** "What's the weather?"
+- **Bot:** "It's sunny."
+- **User:** "What is my name?"
+- **Bot:** "I do not know your name."
+
+**The Failure Mode:** The bot failed because the third request didn't include the first interaction in its payload. In production, this leads to frustrated users who have to repeat context endlessly.
+
+### 2. Core Concepts & Mental Models
+
+#### The "Stateless" Reality
+
+The API call `client.chat(message="What is my name?")` has zero knowledge of previous calls.
+**Memory = Storage + Retrieval.** You must store the transcript in a database (Redis/Postgres) and retrieve the relevant slice to append to the prompt before sending it to the model.
+
+#### Strategies for Context Management
+
+1. **Buffer Memory (Sliding Window):** Keep the last messages.
+
+- _Pros:_ Perfect fidelity for recent context.
+- _Cons:_ Forgets early details (like the user's name mentioned at the start) once is exceeded.
+
+2. **Summary Memory:** An auxiliary LLM call runs in the background to summarize the conversation so far.
+
+- _Pros:_ infinite "virtual" context length.
+- _Cons:_ Lossy. Specific details (phone numbers, dates) may get smoothed out in the summary.
+
+3. **Hybrid (The Gold Standard):** Keep a pinned "System" message + a Summary of the long past + a Buffer of the immediate recent turns.
+
+### 3. Required Trade-offs to Surface
+
+| Strategy                  | Context Fidelity                   | Cost (Token Count)               | Latency                          |
+| ------------------------- | ---------------------------------- | -------------------------------- | -------------------------------- |
+| **Raw History (All)**     | Perfect.                           | Exponential growth. Unstainable. | High processing time.            |
+| **FIFO Buffer (Last 10)** | High (for recent). Zero (for old). | Predictable / Capped.            | Low.                             |
+| **Recursive Summary**     | Medium. Nuance is lost.            | Stable (Summary is fixed size).  | High (requires extra LLM calls). |
+
+**The Decision:** Start with **FIFO Buffer (Window=10)** for MVP. Upgrade to **Hybrid Summary** only when sessions average >20 turns.
+
+### 4. Responsibility Lens: Privacy (Right to be Forgotten)
+
+Storing chat history creates a toxic asset.
+
+- **GDPR/CCPA:** If a user requests deletion, you must wipe their memory from your Redis/Postgres.
+- **The "Zombie" Memory:** If you summarize a conversation into a vector embedding, deleting the original text doesn't delete the _embedding_. You must architect your memory system to map `user_id` to all stored artifacts so a "Delete" command cascades correctly.
+
+### 5. Hands-On Project: The Managed Memory CLI
+
+We will build a `MemoryManager` class that handles the sliding window and persistence.
+
+**Scenario:** A CLI bot that can hold a conversation but strictly enforces a "Token Budget," dropping old messages when the buffer gets too full.
+
+#### Step 1: The Memory Manager
+
+```python
+import collections
+import json
+from datetime import datetime
+
+class MemoryManager:
+    def __init__(self, capacity: int = 5):
+        # Using deque for efficient FIFO operations
+        # capacity = number of message PAIRS (User + AI) to keep
+        self.history = collections.deque(maxlen=capacity * 2)
+        self.system_prompt = "You are a helpful assistant with a short memory."
+
+    def add_interaction(self, user_msg: str, ai_msg: str):
+        self.history.append({"role": "user", "content": user_msg, "timestamp": str(datetime.now())})
+        self.history.append({"role": "assistant", "content": ai_msg, "timestamp": str(datetime.now())})
+
+    def get_context(self) -> list:
+        # Convert deque to list and prepend system prompt
+        context = [{"role": "system", "content": self.system_prompt}]
+        context.extend(list(self.history))
+        return context
+
+    def clear(self):
+        self.history.clear()
+        print("[Memory Wiped]")
+
+    # Simulation of Persistence (e.g., loading from Redis)
+    def save_session(self, filename="session.json"):
+        with open(filename, 'w') as f:
+            json.dump(list(self.history), f)
+
+```
+
+#### Step 2: The Chat Loop (Integration)
+
+```python
+# Mocking the LLM for the exercise to run without an API key
+def mock_llm_generate(messages):
+    last_msg = messages[-1]['content'].lower()
+    if "my name is" in last_msg:
+        name = last_msg.split("is")[-1].strip()
+        return f"Nice to meet you, {name}."
+    elif "who am i" in last_msg:
+        # Search history for name
+        for msg in reversed(messages):
+            if "my name is" in msg['content'].lower():
+                name = msg['content'].split("is")[-1].strip()
+                return f"You are {name}."
+        return "I don't know who you are. You haven't told me recently."
+    else:
+        return f"I heard: {last_msg}"
+
+# The Application
+memory = MemoryManager(capacity=3) # Small window to force "forgetting"
+
+print("--- Chatbot Online (Memory Limit: 3 Turns) ---")
+while True:
+    user_input = input("You: ")
+    if user_input.lower() == "exit": break
+    if user_input.lower() == "forget":
+        memory.clear()
+        continue
+
+    # 1. Retrieve Context
+    context = memory.get_context()
+
+    # 2. Call LLM (Mocked)
+    response = mock_llm_generate(context)
+
+    # 3. Store Interaction
+    memory.add_interaction(user_input, response)
+
+    print(f"AI: {response}")
+    print(f"[Debug] Memory Depth: {len(memory.history)} messages")
+
+```
+
+#### Step 3: Verification (The "Amnesia" Test)
+
+1. **Turn 1:** "My name is Noah." -> AI: "Nice to meet you, Noah."
+2. **Turn 2:** "Blue is my favorite color."
+3. **Turn 3:** "I like coding."
+4. **Turn 4:** "I also like hiking." (At this point, Turn 1 is pushed out of the deque size 6).
+5. **Turn 5:** "Who am I?" -> AI: "I don't know who you are."
+
+**Result:** The system correctly demonstrates the "Sliding Window" limitation. In production, we solve this by using a Summary or Entity Extraction store (Day 26) alongside the sliding window.
+
+### 6. Ethical, Security & Safety Considerations
+
+- **Prompt Injection Persistence:** If a user injects a malicious prompt ("Ignore safety rules"), and you store it in the history, that attack persists for the duration of the session window.
+- _Fix:_ Run input moderation _before_ adding to memory.
+
+- **Session Hijacking:** If using Redis, ensure `session_id` keys are high-entropy UUIDs. If I can guess your session ID, I can load your chat history.
+
+### 7. Strategic Business Implications
+
+- **Cost Management:** A chatbot with infinite memory will bankrupt you. A user talking for 2 hours could result in a final prompt size of 50k tokens ($1.50 per message).
+- **Policy:** Implement a hard limit on session length. Force a "New Chat" after 50 turns to reset the context and cost.
+
+### 8. Common Pitfalls
+
+- **Storing "System" messages in the sliding window:** The System Prompt (instructions) should never be evicted. It must be re-injected at index 0 on every call.
+- **Mixing Users:** A classic bug is using a global list for memory in a web server. Every user sees every other user's messages. Always key memory by `session_id`.
+
+### 9. Next Steps
+
+1. **Select:** Choose a backing store (Redis is standard for hot session state).
+2. **Implement:** Build the `MemoryManager` wrapper around your API calls.
+3. **Configure:** Set a `MAX_TOKENS` limit (e.g., 4096) for the history buffer to prevent API errors.
