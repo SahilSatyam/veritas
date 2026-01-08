@@ -14,7 +14,7 @@ tags: ["Governance", "Benchmarking", "Sustainability"]
 **The Leadership Reality:**
 
 - **The Complexity Tax:** Complex models are harder to debug, slower to infer, and expensive to host.
-- **Opportunity Cost:** The 3 months spent gaining that 0.5% accuracy cost $100,000 in engineering time. Was that 0.5% worth $100k?
+- **Opportunity Cost:** The 3 months spent gaining that 0.5% accuracy cost \$100,000 in engineering time. Was that 0.5% worth \$100k?
 - **Defensibility:** If you cannot prove your deep learning model beats a linear regression significantly, you cannot justify the cloud bill to the CFO.
 
 **System-Wide Implication:** A baseline is not just a comparison point; it is the **viability threshold**. If you can't beat the baseline, you don't have a product.
@@ -167,7 +167,7 @@ print(f"F1 Score: {f1_score(y_test, lr_preds):.4f}")
 - **Inference Costs:**
 - Linear Regression: < 1ms, runs on cheap CPU.
 - Deep Learning: 100ms+, requires GPU instances.
-- _Impact:_ At 1M requests/day, the deep model could cost $5,000/month vs $50/month for the linear one.
+- _Impact:_ At 1M requests/day, the deep model could cost \$5,000/month vs \$50/month for the linear one.
 
 - **Time to Market:** A baseline can be deployed in Day 1. It starts gathering data immediately. A SOTA model takes weeks. Deploy the baseline _first_ to validate the pipeline (Day 5 & 6), then iterate.
 
@@ -178,7 +178,7 @@ print(f"F1 Score: {f1_score(y_test, lr_preds):.4f}")
 - **Comparing Accuracies on Imbalanced Data:** As demonstrated, 99% accuracy is meaningless if the prevalence is 1%. Always use specific metrics (Precision/Recall/F1/AUC) for benchmarking.
 - **"We'll optimize later":** Teams assume they can swap the model easily. If you build your infrastructure around a GPU-heavy container (Day 3), downgrading to a CPU model might actually require infrastructure refactoring. Start simple.
 - **Ignoring the "Rule-Based" Baseline:** Sometimes a simple `if` statement beats ML.
-- _Example:_ "If transaction > $10,000 and location != home, flag it." This heuristic might catch 80% of fraud with $0 training cost.
+- _Example:_ "If transaction > \$10,000 and location != home, flag it." This heuristic might catch 80% of fraud with \$0 training cost.
 
 ---
 
