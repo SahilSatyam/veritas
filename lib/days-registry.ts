@@ -18,7 +18,7 @@ export const daysRegistry: DayRegistryItem[] = [
   { id: "006", title: "Exploratory Data Analysis (EDA) & Profiling", failure: "Digital Redlining", lens: "Safety", domain: "Data Science", status: "done" },
   { id: "007", title: "Feature Engineering & Selection", failure: "Data Leakage", lens: "Reproducibility", domain: "Data Science", status: "done" },
   { id: "008", title: "Baseline Models & Benchmarking", failure: "Complexity Tax", lens: "Governance", domain: "Data Science", status: "done" },
-  { id: "009", title: "Evaluation Metrics for Business", failure: "Metric Misalignment", lens: "Production", domain: "Data Science", status: "locked" },
+  { id: "009", title: "Evaluation Metrics for Business", failure: "Metric Misalignment", lens: "Production", domain: "Data Science", status: "done" },
   { id: "010", title: "Model Validation Strategies", failure: "Temporal Leakage", lens: "Security", domain: "Data Science", status: "locked" },
   { id: "011", title: "Algorithmic Fairness: Auditing & Mitigation Pipelines", failure: "Deployment of Discriminatory Models", lens: "Ethics", domain: "Model Evaluation", status: "locked" },
   { id: "012", title: "Explainable AI (XAI): From Black Box to Glass Box", failure: "Stakeholder Rejection (The Black Box Problem)", lens: "Human Factors", domain: "Model Evaluation", status: "locked" },
