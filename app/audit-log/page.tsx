@@ -21,8 +21,8 @@ export default function AuditLogPage() {
                 <AlertCircle size={16} /> Latest Event: Content Release
               </div>
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                Jan 11, 2026: Released &quot;Algorithmic Fairness: Auditing & Mitigation Pipelines&quot;. 
-                Focused on preventing Deployment of Discriminatory Models via Ethics strategies.
+                Jan 12, 2026: Released &quot;Explainable AI (XAI): From Black Box to Glass Box&quot;. 
+                Focused on preventing Stakeholder Rejection (The Black Box Problem) via Human Factors strategies.
               </p>
             </div>
             
@@ -36,6 +36,12 @@ export default function AuditLogPage() {
                     </tr>
                 </thead>
                 <tbody>
+                    <tr>
+                        <td>2026-01-12</td>
+                        <td><span className={styles.tag}>CONTENT</span></td>
+                        <td>Release Day 012</td>
+                        <td className="font-mono text-micro">d8a1...2f44</td>
+                    </tr>
                     <tr>
                         <td>2026-01-11</td>
                         <td><span className={styles.tag}>CONTENT</span></td>
