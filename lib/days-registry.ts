@@ -23,7 +23,7 @@ export const daysRegistry: DayRegistryItem[] = [
   { id: "011", title: "Algorithmic Fairness: Auditing & Mitigation Pipelines", failure: "Deployment of Discriminatory Models", lens: "Ethics", domain: "Model Evaluation", status: "done" },
   { id: "012", title: "Explainable AI (XAI): From Black Box to Glass Box", failure: "Stakeholder Rejection (The Black Box Problem)", lens: "Human Factors", domain: "Model Evaluation", status: "done" },
   { id: "013", title: "Data Privacy & Anonymization: The Toxic Waste Model", failure: "Regulatory Non-Compliance (GDPR/CCPA)", lens: "Governance", domain: "Data Engineering", status: "done" },
-  { id: "014", title: "Model Cards: The 'Nutrition Label' for AI", failure: "Model Misuse & Context Collapse", lens: "Ethics", domain: "Governance", status: "locked" },
+  { id: "014", title: "Model Cards: The 'Nutrition Label' for AI", failure: "Model Misuse & Context Collapse", lens: "Ethics", domain: "Governance", status: "done" },
   { id: "015", title: "The Generative Shift: LLMs, APIs, and Unit Economics", failure: "Architectural Mismatch & Cost Blowout", lens: "Security", domain: "LLMs / Generative AI", status: "locked" },
   { id: "016", title: "Cloud Infrastructure for AI: Compute, Cost, and Carbon", failure: "Bill Shock & Resource Starvation", lens: "Sustainability", domain: "Infrastructure", status: "locked" },
   { id: "017", title: "CI/CD for ML: The Death of 'It Works on My Machine'", failure: "Manual Deployment Errors", lens: "Security", domain: "MLOps", status: "locked" },
