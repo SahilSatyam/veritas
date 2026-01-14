@@ -35,6 +35,7 @@ export const daysRegistry: DayRegistryItem[] = [
   { id: "023", title: "Prompt Engineering II: Reasoning (CoT & ReAct)", failure: "Logic Hallucination", lens: "Safety", domain: "LLMs", status: "locked" },
   { id: "024", title: "Structured Outputs (JSON Mode & Function Calling)", failure: "Pipeline Breaks (Parser Errors)", lens: "Security", domain: "MLOps", status: "locked" },
   { id: "025", title: "Building Conversational Memory: State Management Patterns", failure: "Conversational Amnesia (Statelessness)", lens: "Privacy (Right to be Forgotten)", domain: "Application Layer", status: "locked" },
+  { id: "026", title: "Evaluating Generative Models (Beyond Accuracy)", failure: "The 'Vibe Check' Trap", lens: "Human Factors", domain: "MLOps", status: "locked" },
 ];
 
 export function isDayUnlocked(id: string): boolean {

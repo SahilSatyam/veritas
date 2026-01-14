@@ -1,0 +1,188 @@
+---
+title: "Evaluating Generative Models (Beyond Accuracy)"
+failure: "The 'Vibe Check' Trap"
+lens: "Human Factors"
+domain: "MLOps"
+day: "026"
+tags: ["Evaluation", "Testing", "Quality Assurance"]
+date: "2026-01-26"
+---
+
+### Abstract
+
+In traditional software, `assert result == expected` is binary. In Generative AI, the "correct" answer is often a distribution, not a single string. This ambiguity leads engineers to rely on the "Vibe Check"—manually chatting with the model for 5 minutes and declaring it "good." This is not engineering; it is gambling. This post establishes a framework for **Systematic AI Evaluation**, moving from naive string matching to semantic similarity and "LLM-as-a-Judge" patterns.
+
+---
+
+### 1. Why This Topic Matters
+
+You wouldn't deploy a financial algorithm based on "it feels right." Yet, teams routinely deploy chatbots because "it answered my three test questions correctly."
+
+**The Failure Mode:** A model update shifts the tone from "professional" to "sarcastic," or stops handling edge cases (like "N/A" inputs). Because your evaluation was manual and ad-hoc, you don't catch this regression until a customer complains on Twitter. You need a **Unit Test Suite for Intelligence**.
+
+### 2. Core Concepts & Mental Models
+
+#### The Death of BLEU & ROUGE
+
+Traditional NLP metrics (BLEU, ROUGE) measure n-gram overlap.
+
+- _Reference:_ "The cat sat on the mat."
+- _Model:_ "A feline rested upon the rug."
+- _BLEU Score:_ Near zero (no word overlap).
+- _Reality:_ The model is correct.
+- **Takeaway:** Do not use text-overlap metrics for chat or reasoning tasks. They correlate poorly with human judgment.
+
+#### The Three Tiers of Evaluation
+
+1. **Deterministic (The "Syntax" Check):**
+
+- Is it valid JSON?
+- Does it contain the required keys?
+- Does it match a specific Regex (e.g., email format)?
+- _Pass/Fail: Binary._
+
+2. **Keyword/Negative Constraints (The "Safety" Check):**
+
+- Did it mention "competitor_name"? (Fail).
+- Did it say "I don't know" when context was missing? (Pass).
+- _Pass/Fail: Binary._
+
+3. **Semantic / LLM-as-a-Judge (The "Vibe" Automator):**
+
+- Does the answer match the _meaning_ of the gold standard?
+- We use a stronger model (e.g., GPT-5.2 or Claude Opus) to grade the output of the production model.
+- _Pass/Fail: Graded (1-5 scale)._
+
+### 3. Required Trade-offs to Surface
+
+| Metric Type             | Cost      | Reliability | Use Case                                               |
+| ----------------------- | --------- | ----------- | ------------------------------------------------------ |
+| **Exact Match / Regex** | Free      | 100%        | Code generation, JSON extraction, formatted IDs.       |
+| **Embedding Distance**  | Cheap     | Medium      | Checking if two sentences are "close" in vector space. |
+| **LLM-as-a-Judge**      | Expensive | High        | Reasoning, tone, summaries, and complex Q&A.           |
+
+**The Decision:** Automate 80% of your suite with cheap Deterministic/Keyword checks. Reserve LLM-as-a-Judge for the complex 20% where nuance matters.
+
+### 4. Responsibility Lens: Human Factors
+
+**Inter-Annotator Agreement (IAA).**
+Before you judge the model, judge your test data.
+If you have a "Gold Answer" for a test case, ask: _Would three senior experts agree this is the only correct answer?_
+
+- **Question:** "What is the capital of France?" (High Agreement).
+- **Question:** "Summarize this email." (Low Agreement).
+
+If humans cannot agree on the "Gold Answer," do not penalize the model for deviating from it. You must calibrate your evaluation dataset to ensure it represents **consensus ground truth**, not just one engineer's opinion.
+
+### 5. Hands-On Project: The Evaluation Harness
+
+We will build a `mini-eval` framework using Python's `pytest`. This moves evaluation from a notebook into your CI/CD pipeline.
+
+**Scenario:** We are testing a customer support bot. It must:
+
+1. Be polite.
+2. Never mention "refunds" (policy restriction).
+3. Output valid JSON.
+
+#### The Test Suite (`test_bot.py`)
+
+```python
+import json
+import pytest
+from typing import List
+
+# Mock of your production system
+def run_chatbot(user_input: str) -> str:
+    # Simulate a "bad" model response for demonstration
+    if "angry" in user_input:
+        return '{"response": "Calm down!", "action": "none"}' # Rude!
+    if "refund" in user_input:
+        return '{"response": "I can process a refund.", "action": "refund_start"}' # Violation!
+    return '{"response": "Hello, how can I help?", "action": "greet"}'
+
+# --- EVALUATION LOGIC ---
+
+# 1. Deterministic: JSON Validity
+def test_json_structure():
+    output = run_chatbot("Hello")
+    try:
+        data = json.loads(output)
+        assert "response" in data
+        assert "action" in data
+    except json.JSONDecodeError:
+        pytest.fail(f"Output is not valid JSON: {output}")
+
+# 2. Negative Constraint: Forbidden Keywords
+def test_no_refund_promises():
+    # Prompt explicitly asks for a refund
+    output = run_chatbot("I want a refund for this broken item.")
+    data = json.loads(output)
+
+    # The policy says: Bot cannot promise refunds, must escalate.
+    forbidden_words = ["process a refund", "give you money back"]
+    for word in forbidden_words:
+        assert word not in data["response"].lower(), f"Safety Violation: Found forbidden phrase '{word}'"
+
+# 3. Heuristic: Politeness Check (Simple Keyword Proxy)
+def test_politeness_heuristic():
+    output = run_chatbot("I am very angry with your service!")
+    data = json.loads(output)
+
+    rude_indicators = ["calm down", "whatever", "not my problem"]
+    for phrase in rude_indicators:
+        assert phrase not in data["response"].lower(), f"Tone Violation: Bot was rude ('{phrase}')"
+
+# 4. LLM-as-a-Judge (Conceptual Code)
+# In production, this calls GPT-4 to grade the output
+def eval_with_judge(user_input, model_output, rubric):
+    # This would make an API call to an evaluator model
+    # evaluator_prompt = f"Grade this response based on: {rubric}..."
+    pass
+
+```
+
+#### Running the Test
+
+Execute `pytest test_bot.py` in your terminal.
+
+- **Result:** `test_no_refund_promises` will **FAIL** because our mock bot promised a refund.
+- **Action:** This blocks the deployment. You have successfully prevented a policy violation reaching production.
+
+### 6. Ethical & Strategic Implications
+
+- **The "Reward Hacking" Risk:** If you optimize purely for a specific metric (e.g., "brevity"), the model might start giving one-word answers ("Yes", "No") that are accurate but useless. Always pair metrics (e.g., Accuracy + Helpfulness).
+- **Test Data Contamination:** Ensure your evaluation questions are _not_ in the training data (if fine-tuning) or the few-shot examples. Testing on training data gives you false confidence (overfitting).
+
+### 7. Code Examples: BertScore (Semantic Similarity)
+
+For times when exact match fails but you have a reference answer.
+
+```python
+# Requires: pip install bert_score
+from bert_score import score
+
+def test_semantic_similarity():
+    reference = "To reset your router, hold the power button for 10 seconds."
+    candidate = "Press and hold the button on the back for ten seconds to reboot."
+
+    # Calculate Similarity
+    P, R, F1 = score([candidate], [reference], lang="en", verbose=False)
+
+    similarity = F1.mean().item()
+    print(f"Semantic Score: {similarity:.4f}")
+
+    # Threshold for "Pass"
+    assert similarity > 0.85, "Response deviated too much from the approved answer."
+
+```
+
+### 8. Common Pitfalls
+
+- **The "Single Question" Test:** Testing only "Hello" and assuming the bot works. You need a **Golden Dataset** of at least 50-100 diverse examples (easy, hard, adversarial).
+- **Ignoring Latency:** An accurate answer that takes 45 seconds is a failure in a chat context. Add `assert execution_time < 3.0` to your tests.
+
+### 9. Next Steps
+
+1. **Build:** Create a `tests/` folder in your AI repository.
+2. **Curate:** Write down 20 "Golden Q&A pairs" that represent ideal behavior.
+3. **Automate:** Write a script that runs these 20 questions against your model and checks for basic failures (length, keywords, JSON validity).

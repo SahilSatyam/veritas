@@ -156,7 +156,7 @@ while True:
 4. **Turn 4:** "I also like hiking." (At this point, Turn 1 is pushed out of the deque size 6).
 5. **Turn 5:** "Who am I?" -> AI: "I don't know who you are."
 
-**Result:** The system correctly demonstrates the "Sliding Window" limitation. In production, we solve this by using a Summary or Entity Extraction store (Day 26) alongside the sliding window.
+**Result:** The system correctly demonstrates the "Sliding Window" limitation. In production, we solve this by using a Summary or Entity Extraction store alongside the sliding window.
 
 ### 6. Ethical, Security & Safety Considerations
 
@@ -180,3 +180,7 @@ while True:
 1. **Select:** Choose a backing store (Redis is standard for hot session state).
 2. **Implement:** Build the `MemoryManager` wrapper around your API calls.
 3. **Configure:** Set a `MAX_TOKENS` limit (e.g., 4096) for the history buffer to prevent API errors.
+
+### Coming Up Next
+
+**Day 26** covers **Evaluating Generative Models (Beyond Accuracy)**. We will establish a framework for **Systematic AI Evaluation**, moving from naive string matching to semantic similarity and "LLM-as-a-Judge" patterns to solve "The 'Vibe Check' Trap".
