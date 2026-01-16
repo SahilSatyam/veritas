@@ -25,7 +25,7 @@ export const daysRegistry: DayRegistryItem[] = [
   { id: "013", title: "Data Privacy & Anonymization: The Toxic Waste Model", failure: "Regulatory Non-Compliance (GDPR/CCPA)", lens: "Governance", domain: "Data Engineering", status: "done" },
   { id: "014", title: "Model Cards: The 'Nutrition Label' for AI", failure: "Model Misuse & Context Collapse", lens: "Ethics", domain: "Governance", status: "done" },
   { id: "015", title: "The Generative Shift: LLMs, APIs, and Unit Economics", failure: "Architectural Mismatch & Cost Blowout", lens: "Security", domain: "LLMs / Generative AI", status: "done" },
-  { id: "016", title: "Cloud Infrastructure for AI: Compute, Cost, and Carbon", failure: "Bill Shock & Resource Starvation", lens: "Sustainability", domain: "Infrastructure", status: "locked" },
+  { id: "016", title: "Cloud Infrastructure for AI: Compute, Cost, and Carbon", failure: "Bill Shock & Resource Starvation", lens: "Sustainability", domain: "Infrastructure", status: "done" },
   { id: "017", title: "CI/CD for ML: The Death of 'It Works on My Machine'", failure: "Manual Deployment Errors", lens: "Security", domain: "MLOps", status: "locked" },
   { id: "018", title: "Data Lineage: The Chain of Custody for AI", failure: "The 'Orphan Model' (Provenance Collapse)", lens: "Governance", domain: "Data Engineering", status: "locked" },
   { id: "019", title: "The ROI of AI: Translating F1 Scores to P&L", failure: "Project Cancellation (The 'Science Project' Trap)", lens: "Ethics", domain: "Strategy", status: "locked" },
