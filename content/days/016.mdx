@@ -8,7 +8,7 @@ date: "2026-01-16"
 
 ### Abstract
 
-AI engineering is not just code; it is logistics. The transition from a laptop CPU to a cloud-based GPU cluster is where most prototypes die, either due to technical bottlenecks (Out of Memory errors) or financial exhaustion (leaving a $32/hour instance running over the weekend). This post establishes the discipline of **AI FinOps**. We dissect the architecture of cloud compute, defining exactly when to use expensive GPUs, how to leverage Spot instances without losing data, and how to automate infrastructure to prevent "zombie instances" from bankrupting your project or needlessly burning carbon.
+AI engineering is not just code; it is logistics. The transition from a laptop CPU to a cloud-based GPU cluster is where most prototypes die, either due to technical bottlenecks (Out of Memory errors) or financial exhaustion (leaving a \$32/hour instance running over the weekend). This post establishes the discipline of **AI FinOps**. We dissect the architecture of cloud compute, defining exactly when to use expensive GPUs, how to leverage Spot instances without losing data, and how to automate infrastructure to prevent "zombie instances" from bankrupting your project or needlessly burning carbon.
 
 ---
 
@@ -16,7 +16,7 @@ AI engineering is not just code; it is logistics. The transition from a laptop C
 
 The cloud is an infinite resource, but your budget is not.
 
-- **The "Weekend" Failure:** A P4d.24xlarge instance on AWS costs approximately $32/hour. Leaving it running from Friday 5 PM to Monday 9 AM costs **$2,048** for zero work. This is a fireable offense in many startups.
+- **The "Weekend" Failure:** A P4d.24xlarge instance on AWS costs approximately \$32/hour. Leaving it running from Friday 5 PM to Monday 9 AM costs **\$2,048** for zero work. This is a fireable offense in many startups.
 - **The VRAM Wall:** You cannot "download more RAM." If your model requires 24GB of VRAM and you provision an A10G (24GB) but load a 32-bit float version of Llama-3, it will crash immediately. Understanding hardware constraints is a prerequisite for deployment.
 - **Carbon Responsibility:** Training a single large model can emit as much carbon as five cars in their lifetimes. Efficient infrastructure is not just cheaper; it is an ethical imperative.
 
@@ -54,7 +54,7 @@ This is the single most critical constraint in AI hardware.
 Spot instances are cheap because the cloud provider can reclaim them with a 2-minute warning.
 
 - **The Engineering Challenge:** If your training takes 4 days and the instance dies on day 3, you lose everything.
-- **The Solution:** **Checkpointing**. You must save the model weights to persistent storage (S3/GCS) every epoch or every $N$ steps. If the instance dies, the next instance resumes from the last checkpoint, not from scratch.
+- **The Solution:** **Checkpointing**. You must save the model weights to persistent storage (S3/GCS) every epoch or every \$N\$ steps. If the instance dies, the next instance resumes from the last checkpoint, not from scratch.
 
 ---
 
