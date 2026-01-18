@@ -21,8 +21,8 @@ export default function AuditLogPage() {
                 <AlertCircle size={16} /> Latest Event: Content Release
               </div>
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                Jan 17, 2026: Released &quot;CI/CD for ML: The Death of &apos;It Works on My Machine&apos;&quot;. 
-                Focused on preventing Manual Deployment Errors via Security strategies.
+                Jan 18, 2026: Released &quot;Data Lineage: The Chain of Custody for AI&quot;. 
+                Focused on preventing The &apos;Orphan Model&apos; (Provenance Collapse) via Governance strategies.
               </p>
             </div>
             
@@ -36,6 +36,12 @@ export default function AuditLogPage() {
                     </tr>
                 </thead>
                 <tbody>
+                    <tr>
+                        <td>2026-01-18</td>
+                        <td><span className={styles.tag}>CONTENT</span></td>
+                        <td>Release Day 018</td>
+                        <td className="font-mono text-micro">f7a3...2c11</td>
+                    </tr>
                     <tr>
                         <td>2026-01-17</td>
                         <td><span className={styles.tag}>CONTENT</span></td>
