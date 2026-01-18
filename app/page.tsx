@@ -1,7 +1,7 @@
 "use client";
 
 import styles from "./page.module.css";
-import { GitBranch, ShieldCheck, Scale, Server } from "lucide-react";
+import { GitBranch, ShieldCheck, Scale, Server, Linkedin } from "lucide-react";
 import Link from "next/link";
 import Tilt from "react-parallax-tilt";
 import LensTag from "./components/LensTag";
@@ -19,6 +19,15 @@ export default function Home() {
             A definitive technical series for high-intent practitioners. 
             Production-grade rigor, zero hype.
           </p>
+          <a 
+            href="https://www.linkedin.com/comm/mynetwork/discovery-see-all?usecase=PEOPLE_FOLLOWS&followMember=sahilsatyam" 
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.linkedinButton}
+          >
+            <Linkedin size={18} />
+            Follow on LinkedIn
+          </a>
         </div>
         <div className={styles.heroRight}>
           <div className={styles.heroMeta}>

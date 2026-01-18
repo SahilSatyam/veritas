@@ -23,6 +23,33 @@
   max-width: 90%;
 }
 
+.linkedinButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  margin-top: 1.5rem;
+  background: var(--accent-color);
+  color: #ffffff;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: 6px;
+  text-decoration: none;
+  border: none;
+  transition: all var(--transition-smooth);
+}
+
+.linkedinButton:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  border-bottom-color: transparent;
+}
+
+.linkedinButton:active {
+  transform: translateY(0);
+}
+
 .heroMeta {
   padding-left: 2rem;
   border-left: 3px solid var(--accent-color);
@@ -49,8 +76,17 @@
   border-radius: 20px;
   padding: 4rem;
   margin-bottom: 4rem;
-  background: radial-gradient(circle at 10% 20%, rgba(42, 75, 85, 0.1) 0%, rgba(255, 255, 255, 0) 50%),
-              radial-gradient(circle at 90% 80%, rgba(138, 180, 191, 0.15) 0%, rgba(255, 255, 255, 0) 50%);
+  background:
+    radial-gradient(
+      circle at 10% 20%,
+      rgba(42, 75, 85, 0.1) 0%,
+      rgba(255, 255, 255, 0) 50%
+    ),
+    radial-gradient(
+      circle at 90% 80%,
+      rgba(138, 180, 191, 0.15) 0%,
+      rgba(255, 255, 255, 0) 50%
+    );
   overflow: visible;
 }
 
@@ -67,9 +103,10 @@
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.4);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 
-              0 2px 4px -1px rgba(0, 0, 0, 0.03),
-              inset 0 0 20px rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.05),
+    0 2px 4px -1px rgba(0, 0, 0, 0.03),
+    inset 0 0 20px rgba(255, 255, 255, 0.5);
   padding: 2rem;
   border-radius: 12px;
   height: 100%;
@@ -78,9 +115,10 @@
 
 .pillarCard:hover {
   border-color: rgba(255, 255, 255, 0.8);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 
-              0 4px 6px -2px rgba(0, 0, 0, 0.05),
-              inset 0 0 20px rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.1),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05),
+    inset 0 0 20px rgba(255, 255, 255, 0.8);
 }
 
 .iconBox {
@@ -214,11 +252,23 @@
 }
 
 @media (max-width: 900px) {
-  .hero { grid-template-columns: 1fr; gap: 2rem; }
-  .heroMeta { border-left: none; border-top: 3px solid var(--accent-color); padding-left: 0; padding-top: 1.5rem; }
-  .pillars { grid-template-columns: 1fr 1fr; }
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+  .heroMeta {
+    border-left: none;
+    border-top: 3px solid var(--accent-color);
+    padding-left: 0;
+    padding-top: 1.5rem;
+  }
+  .pillars {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 600px) {
-  .pillars { grid-template-columns: 1fr; }
+  .pillars {
+    grid-template-columns: 1fr;
+  }
 }
