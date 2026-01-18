@@ -36,6 +36,10 @@ export const daysRegistry: DayRegistryItem[] = [
   { id: "024", title: "Structured Outputs (JSON Mode & Function Calling)", failure: "Pipeline Breaks (Parser Errors)", lens: "Security", domain: "MLOps", status: "locked" },
   { id: "025", title: "Building Conversational Memory: State Management Patterns", failure: "Conversational Amnesia (Statelessness)", lens: "Privacy (Right to be Forgotten)", domain: "Application Layer", status: "locked" },
   { id: "026", title: "Evaluating Generative Models (Beyond Accuracy)", failure: "The 'Vibe Check' Trap", lens: "Human Factors", domain: "MLOps", status: "locked" },
+  { id: "027", title: "Automated Evaluation (LLM-as-a-Judge)", failure: "Scaling Bottlenecks (The Human Review Queue)", lens: "Governance", domain: "MLOps", status: "locked" },
+  { id: "028", title: "Embeddings & Vector Space", failure: "The Synonym Gap (Keyword Mismatch)", lens: "Ethics (Algorithmic Bias)", domain: "RAG / Search", status: "locked" },
+  { id: "029", title: "Vector Databases (Infrastructure)", failure: "Latency Spikes (The O(N) Bottleck)", lens: "Security (Tenant Isolation)", domain: "Infrastructure / RAG", status: "locked" },
+  { id: "030", title: "RAG Architecture I: The Data Pipeline & Chunking Strategy", failure: "Context Fragmentation", lens: "Governance (Data Lineage)", domain: "RAG / Data Engineering", status: "locked" },
 ];
 
 export function isDayUnlocked(id: string): boolean {

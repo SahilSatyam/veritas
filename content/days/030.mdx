@@ -1,0 +1,160 @@
+---
+title: "RAG Architecture I: The Data Pipeline & Chunking Strategy"
+failure: "Context Fragmentation"
+lens: "Governance (Data Lineage)"
+domain: "RAG / Data Engineering"
+day: "030"
+tags: ["RAG", "ETL", "Chunking", "Data Engineering"]
+date: "2026-01-30"
+---
+
+### Abstract
+
+A Retrieval-Augmented Generation (RAG) system is only as good as its data pipeline. Most failures in RAG are not due to the LLM (Reasoning) or the Vector DB (Retrieval), but due to the **Ingestion Layer**. If your chunking strategy blindly slices a sentence in half, the semantic meaning is destroyed before it ever reaches the embedding model. This post details the engineering of a robust RAG pipeline, focusing on **Recursive Chunking**, **Overlap Strategies**, and **Parent Document Retrieval** to solve the "Granularity Trade-off."
+
+---
+
+### 1. Why This Topic Matters
+
+"Garbage In, Garbage Out" applies literally to Vector Search.
+
+- **Scenario:** You index a legal contract.
+- **The Chunk:** `...liability shall not exceed $5,` (End of chunk).
+- **The Next Chunk:** `000.00 unless caused by gross negligence...` (Start of next chunk).
+- **The Failure:** When a user asks "What is the liability cap?", the search engine finds the first chunk, but the LLM sees "$5," and hallucinates a number or fails to answer.
+
+**The Failure Mode:** **Context Fragmentation.** The semantic unit (the full clause) was destroyed by an arbitrary character limit. Your retrieval system is finding "shards" of information, not answers.
+
+### 2. Core Concepts & Mental Models
+
+#### The "Golden Unit" of Meaning
+
+Text must be split at natural semantic boundaries.
+
+- **Naive:** Split every 500 characters. (Fast, destructive).
+- **Recursive:** Try to split by `\n\n` (Paragraph). If too big, split by `\n` (Line). If too big, split by `. ` (Sentence). If still too big, split by characters.
+- **Semantic:** Calculate the cosine similarity between sentence and . If the similarity drops below a threshold, a "topic shift" has occurred—start a new chunk there.
+
+#### The Overlap (Sliding Window)
+
+Always include an overlap (e.g., 50-100 tokens) between chunks. This ensures that if a concept straddles a boundary, at least one chunk captures enough of it to be retrievable.
+
+#### Parent Document Retrieval (The "Small-to-Big" Pattern)
+
+This is the modern standard for high-performance RAG.
+
+1. **Chunk Small (Child):** Embed small sentences (precision).
+2. **Retrieve Small:** Search matches the precise sentence.
+3. **Return Big (Parent):** Instead of feeding the LLM just the sentence, fetch the _entire parent paragraph_ or document window surrounding it.
+
+- _Result:_ Precision of search + Context for reasoning.
+
+### 3. Required Trade-offs to Surface
+
+| Strategy                          | Search Precision                              | Reasoning Context                  | Complexity                                 |
+| --------------------------------- | --------------------------------------------- | ---------------------------------- | ------------------------------------------ |
+| **Large Chunks (1000+ tokens)**   | Low. The vector averages out too many topics. | High. LLM has full context.        | Low.                                       |
+| **Small Chunks (100-200 tokens)** | High. Vector is laser-focused.                | Low. LLM lacks surrounding nuance. | Medium.                                    |
+| **Parent Document Retrieval**     | **High.**                                     | **High.**                          | **High.** Requires mapping ID hierarchies. |
+
+**The Decision:** Default to **Recursive Character Splitting (512 tokens)** with 10% overlap for general knowledge bases. Upgrade to **Parent Document Retrieval** if your users ask complex questions requiring synthesis of multiple paragraphs.
+
+### 4. Responsibility Lens: Governance (Data Lineage)
+
+Data Lineage is the #1 missing feature in amateur RAG pipelines.
+**The "Stale Chunk" Problem:**
+
+1. On Jan 1st, you ingest `Policy_V1.pdf`.
+2. On Feb 1st, `Policy_V1.pdf` is updated to `V2`.
+3. You delete `V1` from your S3 bucket.
+4. **The Leak:** The _vectors_ for `V1` are still in Pinecone. The bot now gives obsolete advice based on deleted documents.
+
+**The Fix:** You must maintain a **Manifest Table** (Postgres/DynamoDB) mapping `Source_Document_ID` `[Vector_ID_1, Vector_ID_2, ...]`.
+Before ingesting `V2`, query the Manifest, get all IDs for `V1`, and issue a batch delete to the Vector DB.
+
+### 5. Hands-On Project: The Recursive Parser
+
+We will compare "Naive" vs. "Recursive" splitting on a complex text to visualize the difference in integrity.
+
+**Scenario:** Parsing a technical specification with headers and lists.
+
+#### The Implementation (using `langchain` logic)
+
+```python
+from typing import List
+
+text_data = """
+# System Architecture
+The system consists of three nodes.
+1. Primary Node: Handles write traffic.
+2. Replica Node: Handles read traffic.
+3. Arbiter: Handles elections.
+
+## Fault Tolerance
+If the Primary fails, the Arbiter promotes a Replica.
+This process takes 300ms.
+"""
+
+# 1. Naive Splitter (Fixed Size)
+def naive_split(text: str, chunk_size: int = 50) -> List[str]:
+    return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+
+# 2. Recursive Splitter (Semantic Hierarchy)
+# Logic: Try splitting by \n\n first, then \n, then spaces.
+def recursive_split(text: str, chunk_size: int = 50) -> List[str]:
+    chunks = []
+
+    # Simple recursive implementation for demo
+    paragraphs = text.split("\n\n")
+    for para in paragraphs:
+        if len(para) < chunk_size:
+            chunks.append(para)
+        else:
+            # If paragraph is too big, split by lines
+            lines = para.split("\n")
+            current_chunk = ""
+            for line in lines:
+                if len(current_chunk) + len(line) < chunk_size:
+                    current_chunk += line + "\n"
+                else:
+                    chunks.append(current_chunk.strip())
+                    current_chunk = line + "\n"
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+    return chunks
+
+print("--- NAIVE SPLIT (Destructive) ---")
+naive_chunks = naive_split(text_data, chunk_size=40)
+for i, c in enumerate(naive_chunks):
+    print(f"[{i}] {c.replace('\n', ' ')}")
+
+print("\n--- RECURSIVE SPLIT (Preserves Meaning) ---")
+rec_chunks = recursive_split(text_data, chunk_size=80) # Slightly larger to fit bullets
+for i, c in enumerate(rec_chunks):
+    print(f"[{i}] {c.replace('\n', ' ')}")
+
+```
+
+**Output Analysis:**
+
+- **Naive Result:** Chunk 1 might end at "Handles write tra". Chunk 2 starts with "ffic." The semantic meaning of "Primary Node" is severed.
+- **Recursive Result:** It respects the `\n` boundaries. The list items ("1. Primary Node...") stay intact because the splitter prioritized newlines over character counts.
+
+### 6. Ethical & Strategic Implications
+
+- **Copyright & Fair Use:** When you chunk a textbook and store it in a vector DB, are you creating a derivative work? In 2026, legal frameworks are stricter. Ensure you have the "Right to Process" the documents you ingest.
+- **PDF Parsing is Hell:** 80% of your engineering time will be spent on PDF extraction (handling multi-column layouts, tables, and headers). "Chat with PDF" is easy to demo, hard to productionize.
+- _Tip:_ Use vision-language models (like GPT-4o-vision) to parse PDFs to Markdown _before_ chunking, rather than text-only libraries like `pypdf` that garble layout.
+
+### 7. Common Pitfalls
+
+- **Indexing Headers Repeatedly:** If you chunk a document, the header "## Pricing" might only appear in the first chunk. The 5th chunk (containing the actual prices) loses the context that it is about "Pricing."
+- _Fix:_ **Contextual Chunking.** Prepend the document title or section header to _every_ chunk text before embedding (but remove it before generating answers to save tokens).
+
+- **Ignoring Metadata:** Embedding text without metadata (`{"date": "2025-01-01", "author": "Legal"}`) makes filtering impossible later.
+
+### 8. Next Steps
+
+1. **Audit:** Look at your current chunks. Are they cutting off sentences?
+2. **Upgrade:** Switch from `CharacterTextSplitter` to `RecursiveCharacterTextSplitter`.
+3. **Plan:** Design the "Manifest Table" for your database to handle updates/deletes.

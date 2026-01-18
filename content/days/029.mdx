@@ -1,0 +1,167 @@
+---
+title: "Vector Databases (Infrastructure)"
+failure: "Latency Spikes (The O(N) Bottleck)"
+lens: "Security (Tenant Isolation)"
+domain: "Infrastructure / RAG"
+day: "029"
+tags: ["Vector DB", "HNSW", "pgvector", "Scale"]
+date: "2026-01-29"
+---
+
+### Abstract
+
+Storing embeddings in a NumPy array and iterating through them works for 1,000 documents. It crashes the server at 10 million. Vector Databases (Vector DBs) are the specialized infrastructure that solves the **Nearest Neighbor Search** problem at scale. They trade mathematical perfection (Exact Search) for massive speed (Approximate Search) using graph-based indexing algorithms like HNSW. This post guides you through selecting the right store—whether it's a dedicated cluster (Pinecone/Weaviate) or an extension of your existing SQL database (pgvector).
+
+---
+
+### 1. Why This Topic Matters
+
+In RAG (Retrieval-Augmented Generation) systems, the "Retrieval" step is the bottleneck.
+If your user asks a question, and your system takes 5 seconds just to find the relevant context before even sending it to the LLM, the UX is dead.
+
+**The Failure Mode:** You launch a prototype using `np.dot` loops. It feels snappy. Six months later, you ingest your company's archived emails (2M+ vectors). Suddenly, every query spikes CPU to 100% and times out because you are performing millions of floating-point calculations per request.
+
+### 2. Core Concepts & Mental Models
+
+#### The Index: HNSW (Hierarchical Navigable Small World)
+
+Think of HNSW like a highway system for high-dimensional space.
+
+- **Layer 0 (Ground):** Every single data point connects to its nearest neighbors. (Slow to traverse).
+- **Layer 1 (Local Roads):** Connects points that are slightly further apart.
+- **Layer 2 (Interstates):** Connects distant regions.
+
+When a query comes in, the search starts at the top layer ("Interstate") to quickly zoom into the right neighborhood, then drops down to "Local Roads" to find the specific address. This reduces the search complexity from **O(N)** (checking every item) to **O(log N)**.
+
+#### The Landscape: Specialized vs. Integrated
+
+1. **Specialized (Pinecone, Weaviate, Qdrant):** Built from scratch for vectors.
+
+- _Pros:_ Extremely fast, advanced hybrid search (keyword+vector), managed scaling.
+- _Cons:_ Another piece of infrastructure to maintain/pay for. Data consistency lag.
+
+2. **Integrated (pgvector for Postgres):**
+
+- _Pros:_ ACID compliance, joins with relational data, zero new infra (if you use Postgres).
+- _Cons:_ Historically slower (though catching up), limits on index size in RAM.
+
+### 3. Required Trade-offs to Surface
+
+| Trade-off             | Exact Search (k-NN)                                  | Approximate Search (ANN)                                                           |
+| --------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **Accuracy (Recall)** | 100%. Guaranteed to find the absolute closest match. | ~95-99%. Might miss the #1 match if it's an outlier, but finds the top 5 reliably. |
+| **Latency**           | Linear O(N). 10ms for 1k items; 10s for 1M items.    | Logarithmic O(log N). 2ms for 1k items; 5ms for 1M items.                          |
+| **Memory**            | Low. Can read from disk.                             | High. HNSW indexes are RAM-hungry.                                                 |
+
+**The Decision:** Always use **ANN (HNSW)** for production RAG. The user cannot tell the difference between the 1st and 2nd best context, but they _can_ tell the difference between 50ms and 5 seconds.
+
+### 4. Responsibility Lens: Security (Tenant Isolation)
+
+A Vector DB is a "Shared Brain." If you put data from **Company A** and **Company B** into the same index without rigid separation, you risk a **Cross-Tenant Leak**.
+
+- _Scenario:_ Company A searches "Quarterly Strategy."
+- _Leak:_ The vector search ignores the metadata filter (due to a bug or configuration error) and returns a semantic match from Company B's uploaded strategy document.
+
+**The Fix:**
+
+1. **Hard Isolation (Namespaces):** Use physically separate indexes or namespaces (supported by Pinecone/Weaviate) for each tenant.
+2. **Soft Isolation (Metadata Filtering):** Tag every vector with `tenant_id: "company_a"`. Ensure your query function _enforces_ this filter at the API gateway level, never trusting the client.
+
+### 5. Hands-On Project: The Metadata-Filtered Search
+
+We will use `chromadb` (a lightweight, open-source vector store) to demonstrate **Pre-filtering**. We will ingest documents with different security clearances and prove that a low-clearance query cannot retrieve high-clearance secrets, even if they are semantically identical.
+
+**The Scenario:** An internal HR bot.
+
+#### Step 1: Setup and Ingestion
+
+```python
+import chromadb
+from chromadb.utils import embedding_functions
+
+# 1. Initialize Client (In-memory for this exercise)
+client = chromadb.Client()
+
+# 2. Create Collection (The "Index")
+# We use the default embedding function (all-MiniLM-L6-v2) built into Chroma
+collection = client.create_collection(name="corporate_policies")
+
+# 3. Add Documents with Metadata
+documents = [
+    "Employees are entitled to 4 weeks of paid vacation.",
+    "The CEO's salary is $5,000,000 per year.",
+    "Server passwords are stored in the blue vault.",
+    "Lunch is served at 12:00 PM."
+]
+
+metadatas = [
+    {"department": "HR", "access_level": "public"},
+    {"department": "HR", "access_level": "executive"}, # SECRET
+    {"department": "IT", "access_level": "admin"},     # SECRET
+    {"department": "General", "access_level": "public"}
+]
+
+ids = ["doc1", "doc2", "doc3", "doc4"]
+
+collection.add(
+    documents=documents,
+    metadatas=metadatas,
+    ids=ids
+)
+print("--- Ingestion Complete ---")
+
+```
+
+#### Step 2: The Secure Query (Pre-Filtering)
+
+We want to search for "salary information" but restrict it to a "public" employee.
+
+```python
+def secure_search(query_text: str, user_access_level: str):
+    print(f"Query: '{query_text}' | User Role: {user_access_level}")
+
+    results = collection.query(
+        query_texts=[query_text],
+        n_results=2,
+        # THE CRITICAL PART: Metadata Filtering
+        # "where" clause filters the candidate list BEFORE the top-k selection
+        where={"access_level": user_access_level}
+    )
+
+    for doc, meta in zip(results['documents'][0], results['metadatas'][0]):
+        print(f"Found: {doc} (Access: {meta['access_level']})")
+
+# Test 1: Public User searching for secrets
+secure_search("How much does the CEO make?", "public")
+# Expected: Should NOT find the CEO salary doc.
+# Might find "Vacation" or "Lunch" if semantically close, or nothing.
+
+print("-" * 20)
+
+# Test 2: Executive searching for secrets
+secure_search("How much does the CEO make?", "executive")
+# Expected: Finds the $5M salary document.
+
+```
+
+**Why Pre-filtering matters:** If we searched _first_ (getting top 5 matches) and _then_ filtered by metadata in Python, the "CEO Salary" doc might be the #1 match, get filtered out, and leave us with only 4 results (or zero, if all top matches were secret). Pre-filtering (Native filtering) ensures we always get `n` valid results.
+
+### 6. Ethical & Strategic Implications
+
+- **The "Frozen Brain" Problem:** Once you index 10M vectors, changing your embedding model (e.g., from OpenAI to Cohere) requires a **Full Re-index**. This is expensive (compute costs) and slow. Choose your embedding model for the long haul.
+- **Vendor Lock-in:** Vector DBs have proprietary APIs. `pgvector` is the safest strategic bet for minimizing lock-in, as it's just SQL. Moving from Weaviate to Pinecone requires a full data migration script.
+
+### 7. Common Pitfalls
+
+- **Metadata Explosion:** Creating a unique metadata field for every user ID (e.g., `user_id_12345`) can bloat the index in some DBs. Check the "high cardinality" limits of your chosen vendor.
+- **Ignoring Dimensions:** Trying to insert a 1536-dim vector (OpenAI) into a 768-dim index (HuggingFace) will crash the write operation. Ensure schema alignment.
+
+### 8. Next Steps
+
+1. **Select:** If you are on AWS/Azure, check if your current Postgres instance supports `pgvector`. It's often the easiest path.
+2. **Prototype:** Run the Chroma script above locally.
+3. **Benchmark:** Before buying Enterprise Pinecone, measure if your latency is actually a problem. Up to 100k vectors, simple local libraries (FAISS/Chroma) are surprisingly fast.
+
+### Coming Up Next
+
+**Day 30** covers **RAG Architecture I: The Data Pipeline & Chunking Strategy**. We will detail the **Recursive Chunking**, **Overlap Strategies**, and **Parent Document Retrieval** to solve "Context Fragmentation" in RAG systems.

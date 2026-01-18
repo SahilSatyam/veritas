@@ -1,0 +1,167 @@
+---
+title: "Embeddings & Vector Space"
+failure: "The Synonym Gap (Keyword Mismatch)"
+lens: "Ethics (Algorithmic Bias)"
+domain: "RAG / Search"
+day: "028"
+tags: ["Embeddings", "Search", "Vectors"]
+date: "2026-01-28"
+---
+
+### Abstract
+
+Traditional search engines (like Lucene/Elasticsearch default) operate on **keyword matching**. If a user searches for "billing," and your document contains "invoicing," the search returns zero results. This is the "Synonym Gap," and it kills user experience. In modern AI Engineering, we solve this by converting text into **Embeddings**—high-dimensional vectors that represent _meaning_, not just characters. This post explores the mathematics of semantic space and how to operationalize it without blowing up your latency budget.
+
+---
+
+### 1. Why This Topic Matters
+
+Language is messy. Humans use different words to describe the same concept.
+
+- **User Query:** "My internet is down."
+- **Knowledge Base:** "Troubleshooting connectivity issues."
+- **Keyword Match:** 0% overlap.
+- **Semantic Match:** 95% similarity.
+
+**The Failure Mode:** You build a chatbot that answers questions only if the user guesses the _exact_ vocabulary used by your technical writers. This forces users to play "keyword bingo" to get help.
+
+### 2. Core Concepts & Mental Models
+
+#### The "Meaning Space" (Latent Space)
+
+Imagine a 2D map. "Dog" is at coordinate (1, 1). "Cat" is at (1, 2). "Car" is far away at (10, 10).
+Embeddings do this in **High-Dimensional Space** (e.g., 1,536 dimensions for `text-embedding-3-small`).
+
+- The model learns to place semantically similar text close together.
+- The raw text is discarded; only the coordinate vector remains.
+
+#### Dimensions: The "Resolution" of Meaning
+
+- **768 dimensions (BERT/SBERT):** Good for simple sentence similarity. Fast to index.
+- **1536 dimensions (OpenAI Ada-002):** The standard workhorse.
+- **3072 dimensions (OpenAI Large / Mistral Embed):** High definition. Captures subtle nuances (e.g., distinguishing "legal contract" from "binding agreement").
+
+#### Distance Metrics
+
+How do we measure "closeness"?
+
+1. **Cosine Similarity:** Measures the cosine of the angle between two vectors. Values range from -1 (opposite) to 1 (identical). **Most common for text.** It cares about _direction_ (topic), not magnitude (length).
+2. **Euclidean Distance (L2):** Measures the straight-line distance. Sensitive to document length (magnitude).
+3. **Dot Product:** Faster to calculate, but requires vectors to be normalized (length = 1) to be equivalent to Cosine Similarity.
+
+### 3. Required Trade-offs to Surface
+
+| Trade-off          | Small Vectors (384-768 dim)                              | Large Vectors (1536-3072 dim)                          |
+| ------------------ | -------------------------------------------------------- | ------------------------------------------------------ |
+| **Storage Cost**   | Low. 1M docs ≈ 3GB RAM.                                  | High. 1M docs ≈ 12GB+ RAM (Vector DBs are RAM-hungry). |
+| **Search Latency** | Lightning fast.                                          | Slower (4x more calculations per comparison).          |
+| **Nuance**         | Misses subtle distinctions (e.g., specific vs. general). | Captures deep semantic relationships.                  |
+
+**The Decision:** For a standard internal knowledge base (RAG), **1536 dimensions** is the sweet spot. For massive scale (100M+ items), use **Binary Quantization** (compressing vectors) or smaller models to save RAM.
+
+### 4. Responsibility Lens: Ethics (Vector Bias)
+
+Models learn meaning from the internet. The internet is biased. Therefore, embeddings are biased.
+
+**The "King - Man" Test:**
+In classic embeddings (Word2Vec/GloVe):
+
+This seems cool, until you test professions:
+
+**Production Risk:** If you use vectors for **Resume Matching**, your system might rank male candidates higher for "Engineer" searches purely due to this latent bias, violating Equal Opportunity laws. You must audit your retrieval rankings for demographic skew.
+
+### 5. Hands-On Project: The Semantic Sorter
+
+We will build a script that sorts a list of words based on their semantic proximity to a query, using raw vector math.
+
+**Scenario:** You have a mixed list of inventory items. A user searches for "Apple." We need to determine if they mean the fruit or the tech company based on the context of the results.
+
+#### The Implementation
+
+```python
+import numpy as np
+from typing import List
+
+# 1. Mocking the Embedding Function
+# In production, use: client.embeddings.create(input=text, model="text-embedding-3-small")
+def get_mock_embedding(text: str) -> np.ndarray:
+    # Simulating 3 dimensions for visualization ease (Technology, Nature, Food)
+    # [Tech, Nature, Food]
+    lookup = {
+        "apple_fruit": [0.1, 0.9, 0.9], # Low tech, high nature, high food
+        "apple_corp":  [0.9, 0.1, 0.1], # High tech, low nature, low food
+        "iphone":      [0.95, 0.0, 0.0],
+        "pie":         [0.0, 0.5, 0.95],
+        "tree":        [0.0, 0.9, 0.2],
+        "microsoft":   [0.9, 0.0, 0.0],
+        "dog":         [0.0, 0.8, 0.0]
+    }
+    return np.array(lookup.get(text, [0,0,0]))
+
+# 2. Cosine Similarity Function
+def cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:
+    dot_product = np.dot(v1, v2)
+    norm_v1 = np.linalg.norm(v1)
+    norm_v2 = np.linalg.norm(v2)
+
+    if norm_v1 == 0 or norm_v2 == 0:
+        return 0.0
+    return dot_product / (norm_v1 * norm_v2)
+
+# 3. The Search Logic
+def semantic_search(query_key: str, corpus: List[str]):
+    query_vec = get_mock_embedding(query_key)
+
+    results = []
+    for item in corpus:
+        item_vec = get_mock_embedding(item)
+        score = cosine_similarity(query_vec, item_vec)
+        results.append((item, score))
+
+    # Sort by score descending
+    results.sort(key=lambda x: x[1], reverse=True)
+    return results
+
+# 4. Execution
+corpus = ["iphone", "pie", "tree", "microsoft", "dog"]
+
+# Case A: User means Apple (The Company) - represented by 'apple_corp' embedding
+print(f"--- Search: 'Apple' (Tech Context) ---")
+results_tech = semantic_search("apple_corp", corpus)
+for item, score in results_tech:
+    print(f"{item}: {score:.4f}")
+
+# Case B: User means Apple (The Fruit) - represented by 'apple_fruit' embedding
+print(f"\n--- Search: 'Apple' (Fruit Context) ---")
+results_fruit = semantic_search("apple_fruit", corpus)
+for item, score in results_fruit:
+    print(f"{item}: {score:.4f}")
+
+```
+
+**Expected Output:**
+
+- **Tech Context:** `iphone` and `microsoft` will be at the top. `pie` will be near the bottom.
+- **Fruit Context:** `pie` and `tree` will be at the top. `iphone` will be near the bottom.
+
+This demonstrates that "Apple" is just a point in space. Its neighbors define its meaning.
+
+### 6. Ethical & Strategic Implications
+
+- **The "Black Box" of Search:** When you switch to vector search, you lose explainability. Why did document X appear? "Because the dot product was 0.89." This is hard to explain to a compliance officer who wants to know why a specific policy document wasn't found.
+- **Strategy:** Maintain **Hybrid Search** (Keyword + Vector). Let users force exact matches when they know the specific document ID or title.
+
+### 7. Common Pitfalls
+
+- **Re-indexing Costs:** If you change your embedding model (e.g., upgrade from OpenAI Ada-002 to Embedding-3), you must re-embed **every single document** in your database. This is expensive and time-consuming. Choose your model capability wisely at the start.
+- **Ignoring "Stop Words" in Vectors:** While vectors handle stop words better than keywords, a query like "The IT Policy" is dominated by the word "IT". The vector for "The" adds noise.
+
+### 8. Next Steps
+
+1. **Experiment:** Go to the OpenAI Playground or HuggingFace and visualize how close "King" and "Queen" are compared to "King" and "Car".
+2. **Plan:** If you have a search bar in your product, plan a proof-of-concept to replace it with a Vector Search endpoint.
+3. **Read:** Day 29, where we will put these vectors into a dedicated Vector Database (Pinecone/Weaviate).
+
+### Coming Up Next
+
+**Day 29** covers **Vector Databases (Infrastructure)**. We will explore specialized infrastructure that solves the **Nearest Neighbor Search** problem at scale, solving "Latency Spikes" and ensuring tenant isolation.

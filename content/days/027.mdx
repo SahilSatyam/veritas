@@ -1,0 +1,179 @@
+---
+title: "Automated Evaluation (LLM-as-a-Judge)"
+failure: "Scaling Bottlenecks (The Human Review Queue)"
+lens: "Governance"
+domain: "MLOps"
+day: "027"
+tags: ["Evaluation", "Automation", "Scale"]
+date: "2026-01-27"
+---
+
+### Abstract
+
+Manual evaluation is the enemy of velocity. If you rely on humans to review every model output before release, your iteration cycle is measured in weeks, not hours. To achieve Continuous Deployment (CD) for AI, we must decouple "Confidence" from "Human Effort." This post details the **LLM-as-a-Judge** pattern: using a highly capable "Teacher" model (e.g., Claude Opus 4.5) to evaluate the outputs of production models, enabling scalable, automated quality gates.
+
+---
+
+### 1. Why This Topic Matters
+
+In traditional software, unit tests run in milliseconds. In AI, "tests" often involve reading a generated paragraph and checking for hallucinations. This is slow and expensive.
+
+**The Failure Mode:** You have a new prompt that improves reasoning by 20%, but you can't ship it because you have a backlog of 5,000 regression tests that need human review. You skip the review, ship it, and discover too late that the new prompt causes the model to be rude to 5% of users.
+
+### 2. Core Concepts & Mental Models
+
+#### The Teacher-Student Hierarchy
+
+You typically use a massive, expensive model (The Judge) to grade the outputs of a faster, cheaper model (The Student).
+
+- **Student:** GPT-4o-mini / Llama-3-8B (Production Runner).
+- **Judge:** GPT-5.2-Thinking / Claude Opus 4.5 (Offline Auditor).
+- **Why?** The Judge is too slow/expensive for users, but perfect for batch testing.
+
+#### Pairwise Comparison (A/B Testing)
+
+Instead of asking "Is this summary good?" (which is subjective), ask "Is Summary A better than Summary B?"
+This mimics human preference ranking (RLHF) and yields more stable results than asking for a 1-10 score.
+
+#### The Bias Traps
+
+- **Positional Bias:** LLMs have a statistical preference for the _first_ option presented. "Summary A" wins 55% of the time just because it is first.
+- **Verbosity Bias:** LLMs tend to rate longer answers as "better," even if they are fluffy.
+
+### 3. Required Trade-offs to Surface
+
+| Trade-off  | Human Eval                                | Automated (LLM) Eval                                                  |
+| ---------- | ----------------------------------------- | --------------------------------------------------------------------- |
+| **Speed**  | Slow (Days/Weeks).                        | Fast (Minutes).                                                       |
+| **Cost**   | High ($50+/hr per expert).                | Medium ($0.03 per test case).                                         |
+| **Nuance** | Maximum. Humans catch subtle tone issues. | High, but misses "unknown unknowns" or highly domain-specific errors. |
+
+**The Decision:** Use Automated Eval for **Regression Testing** (Did we break anything?). Use Human Eval for **Acceptance Testing** (Is this new capability actually useful?).
+
+### 4. Responsibility Lens: Governance
+
+**No Self-Grading.**
+Never use the same model to grade itself. A model usually shares its own biases. If `GPT-4o` hallucinates a fact, `GPT-4o` (acting as judge) is likely to accept that hallucination as truth.
+
+- _Rule:_ Cross-check. If using OpenAI for generation, use Anthropic for evaluation (and vice-versa). This reduces the risk of shared "blind spots."
+
+### 5. Hands-On Project: The "Summarization Showdown"
+
+We will build a script that takes a news article and two different summaries, then asks a Judge model to decide the winner based on **Fidelity** and **Conciseness**.
+
+**Scenario:** You are refactoring your summarization prompt. You need to know if the new prompt (Candidate B) is better than the old one (Candidate A).
+
+#### Step 1: The Judge Prompt
+
+We use a structured prompt that forces the model to explain its reasoning _before_ declaring a winner (Chain of Thought).
+
+```python
+import json
+from typing import Dict
+
+def evaluate_summaries(article: str, summary_a: str, summary_b: str, judge_client) -> Dict:
+
+    judge_system_prompt = """
+    ### ROLE
+    You are an Expert Editor and Fact-Checker.
+
+    ### TASK
+    Compare two summaries of the same article. Decide which is better.
+
+    ### CRITERIA
+    1. Accuracy: Does it include facts not in the source text? (Immediate Disqualification).
+    2. Completeness: Does it capture the main point?
+    3. Conciseness: Is it efficient?
+
+    ### OUTPUT FORMAT
+    Return valid JSON only:
+    {
+        "reasoning": "Step-by-step comparison...",
+        "winner": "A" | "B" | "Tie"
+    }
+    """
+
+    user_content = f"""
+    <article>
+    {article}
+    </article>
+
+    <summary_a>
+    {summary_a}
+    </summary_a>
+
+    <summary_b>
+    {summary_b}
+    </summary_b>
+    """
+
+    response = judge_client.chat.completions.create(
+        model="claude-3-opus-20240229", # The "Teacher" Model
+        messages=[
+            {"role": "system", "content": judge_system_prompt},
+            {"role": "user", "content": user_content}
+        ],
+        temperature=0 # Deterministic grading
+    )
+
+    return json.loads(response.choices[0].message.content)
+
+
+```
+
+#### Step 2: Running the Evaluation
+
+Imagine we have an article about a market crash.
+
+- **Summary A (Old):** "The market went down today because tech stocks fell. It was bad."
+- **Summary B (New):** "The S&P 500 fell 2.4% on Tuesday, led by a sell-off in semiconductor stocks following new export restrictions."
+
+```python
+# Pseudo-code execution
+result = evaluate_summaries(article_text, summary_a, summary_b, client)
+
+print(f"Winner: {result['winner']}")
+print(f"Reason: {result['reasoning']}")
+
+```
+
+- **Expected Judge Output:**
+- _Reasoning:_ "Summary A is vague and lacks specific data. Summary B correctly identifies the index, the percentage drop, and the specific sector cause found in the text."
+- _Winner:_ "B"
+
+#### Step 3: Mitigating Positional Bias
+
+To make this production-grade, you must run the test **twice**, swapping the order.
+
+1. Run `evaluate(A, B)`
+2. Run `evaluate(B, A)`
+3. **Result:**
+
+- If both say "B is better" (Winner B, Winner A respectively in slot 1), then B is the true winner.
+- If the judge always picks the first option, the result is inconclusive.
+
+### 6. Ethical & Safety Considerations
+
+- **The "Sycophancy" of Judges:** Some models are trained to be agreeable. If Summary A says "The earth is flat," and the Article says "The earth is round," a weak judge might say "Summary A is good because it is confident." You must explicitly instruct the judge to penalize factual contradictions.
+- **Defining "Better":** If you don't define criteria, the Judge will use its own definition. For a safety bot, "Better" means "Refused to answer dangerous question." For a creative bot, "Refusal" is a failure. **Inject the criteria dynamically.**
+
+### 7. Strategic Business Implications
+
+- **The "Golden Set" Asset:** Your repository of 500 evaluations (Input + Winner) is high-value IP. It allows you to fine-tune a smaller model to become the judge later, saving costs.
+- **Confidence to Pivot:** When you have an automated judge, you can switch from OpenAI to Mistral in an afternoon. You run the evaluation suite, see that Mistral scores 98% relative to OpenAI on your tasks, and flip the switch.
+
+### 8. Common Pitfalls
+
+- **Using `temperature=1` for Grading:** Judges must be deterministic. Always use `temperature=0`.
+- **Over-reliance:** LLM Judges are bad at math and visual tasks. Do not use them to grade Code Execution output (use a real compiler for that) or Image Generation.
+
+### 9. Next Steps
+
+1. **Select:** Pick 50 historical inputs from your logs.
+2. **Generate:** Run them through your _current_ model and your _proposed_ update.
+3. **Judge:** Write the script above to compare them.
+4. **Analyze:** If the Judge says the new model wins >55% of the time, proceed to manual review.
+
+### Coming Up Next
+
+**Day 28** covers **Embeddings & Vector Space**. Use **Embeddings**—high-dimensional vectors that represent _meaning_, not just characters to solve "The Synonym Gap" and improve user experience.
