@@ -100,7 +100,7 @@ def normalize_transactions(df: pd.DataFrame) -> pd.DataFrame:
     Assumption: 'amount' is in USD.
     """
     # DANGEROUS: Assumes 'amount' is never 0 or negative
-    df['log_amount'] = pd.np.log(df['amount'])
+    df['log_amount'] = np.log(df['amount'])
 
     # DANGEROUS: Fills with string 'Unknown', might break downstream int-only models
     df['category'] = df['category'].fillna('Unknown')

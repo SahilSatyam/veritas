@@ -97,6 +97,7 @@ from sklearn.model_selection import train_test_split
 # Key interaction: High Income usually good, but High Income + High Debt is bad.
 np.random.seed(42)
 N = 2000
+X = pd.DataFrame({
     'Income': np.random.randint(30000, 150000, N),
     'Debt': np.random.randint(0, 50000, N),
     'Age': np.random.randint(20, 70, N)
