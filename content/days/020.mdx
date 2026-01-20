@@ -119,7 +119,7 @@ def main():
     mlflow.set_experiment(cfg['project_name'])
 
     with mlflow.start_run() as run:
-        logger.info("🚀 Pipeline Started")
+        logger.info("Pipeline Started")
 
         # 1. Ingestion (Day 2 & 3)
         logger.info("Step 1: Ingestion & Validation")
@@ -155,7 +155,7 @@ def main():
         mlflow.log_metric("disparate_impact", fairness_score)
 
         if fairness_score < cfg['governance']['fairness_threshold']:
-            logger.warning(f"⚠️ Fairness Alert: DIR {fairness_score:.2f} is below threshold!")
+            logger.warning(f"Fairness Alert: DIR {fairness_score:.2f} is below threshold!")
             mlflow.set_tag("compliance_status", "FAIL")
         else:
             mlflow.set_tag("compliance_status", "PASS")
@@ -167,7 +167,7 @@ def main():
 
         # 7. Serialize
         mlflow.sklearn.log_model(model, "model")
-        logger.info("✅ Pipeline Complete. Model registered.")
+        logger.info("Pipeline Complete. Model registered.")
 
 if __name__ == "__main__":
     try:
