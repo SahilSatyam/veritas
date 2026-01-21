@@ -189,7 +189,7 @@ export default async function DayPage({ params }: { params: Promise<{ id: string
            <div>
             <h4 style={{ fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', marginBottom: '1rem', color: 'var(--text-secondary)' }}>Audit Logs</h4>
             <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-              Last Updated: Jan 01, 2026<br/>
+              Last Updated: {dayData.date ? new Date(dayData.date as string).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Jan 01, 2026'}<br/>
               Author: System Arch Group
             </div>
           </div>

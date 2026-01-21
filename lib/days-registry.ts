@@ -30,7 +30,7 @@ export const daysRegistry: DayRegistryItem[] = [
   { id: "018", title: "Data Lineage: The Chain of Custody for AI", failure: "The 'Orphan Model' (Provenance Collapse)", lens: "Governance", domain: "Data Engineering", status: "done" },
   { id: "019", title: "The ROI of AI: Translating F1 Scores to P&L", failure: "Project Cancellation (The 'Science Project' Trap)", lens: "Ethics", domain: "Strategy", status: "done" },
   { id: "020", title: "Phase 1 Capstone: The 'End-to-End' Production Pipeline", failure: "Integration Hell (Fragmented Architecture)", lens: "Reproducibility", domain: "Orchestration", status: "done" },
-  { id: "021", title: "The LLM API Landscape (OpenAI, Anthropic, Mistral)", failure: "Vendor Lock-in", lens: "Governance", domain: "MLOps", status: "locked" },
+  { id: "021", title: "The LLM API Landscape (OpenAI, Anthropic, Mistral)", failure: "Vendor Lock-in", lens: "Governance", domain: "MLOps", status: "done" },
   { id: "022", title: "Prompt Engineering I: Structure & Context", failure: "Garbage In, Garbage Out (Ambiguity)", lens: "Human Factors", domain: "MLOps", status: "locked" },
   { id: "023", title: "Prompt Engineering II: Reasoning (CoT & ReAct)", failure: "Logic Hallucination", lens: "Safety", domain: "LLMs", status: "locked" },
   { id: "024", title: "Structured Outputs (JSON Mode & Function Calling)", failure: "Pipeline Breaks (Parser Errors)", lens: "Security", domain: "MLOps", status: "locked" },
