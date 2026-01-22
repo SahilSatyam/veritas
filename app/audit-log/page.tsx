@@ -21,8 +21,8 @@ export default function AuditLogPage() {
                 <AlertCircle size={16} /> Latest Event: Content Release
               </div>
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                Jan 21, 2026: Released &quot;The LLM API Landscape (OpenAI, Anthropic, Mistral)&quot;. 
-                Focused on preventing Vendor Lock-in via Governance strategies.
+                Jan 22, 2026: Released &quot;Prompt Engineering I: Structure & Context&quot;. 
+                Focused on preventing Garbage In, Garbage Out (Ambiguity) via Human Factors strategies.
               </p>
             </div>
             
@@ -36,6 +36,12 @@ export default function AuditLogPage() {
                     </tr>
                 </thead>
                 <tbody>
+                    <tr>
+                        <td>2026-01-22</td>
+                        <td><span className={styles.tag}>CONTENT</span></td>
+                        <td>Release Day 022</td>
+                        <td className="font-mono text-micro">f2e3...1c99</td>
+                    </tr>
                     <tr>
                         <td>2026-01-21</td>
                         <td><span className={styles.tag}>CONTENT</span></td>
