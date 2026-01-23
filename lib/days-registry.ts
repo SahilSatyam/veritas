@@ -32,7 +32,7 @@ export const daysRegistry: DayRegistryItem[] = [
   { id: "020", title: "Phase 1 Capstone: The 'End-to-End' Production Pipeline", failure: "Integration Hell (Fragmented Architecture)", lens: "Reproducibility", domain: "Orchestration", status: "done" },
   { id: "021", title: "The LLM API Landscape (OpenAI, Anthropic, Mistral)", failure: "Vendor Lock-in", lens: "Governance", domain: "MLOps", status: "done" },
   { id: "022", title: "Prompt Engineering I: Structure & Context", failure: "Garbage In, Garbage Out (Ambiguity)", lens: "Human Factors", domain: "MLOps", status: "done" },
-  { id: "023", title: "Prompt Engineering II: Reasoning (CoT & ReAct)", failure: "Logic Hallucination", lens: "Safety", domain: "LLMs", status: "locked" },
+  { id: "023", title: "Prompt Engineering II: Reasoning (CoT & ReAct)", failure: "Logic Hallucination", lens: "Safety", domain: "LLMs", status: "done" },
   { id: "024", title: "Structured Outputs (JSON Mode & Function Calling)", failure: "Pipeline Breaks (Parser Errors)", lens: "Security", domain: "MLOps", status: "locked" },
   { id: "025", title: "Building Conversational Memory: State Management Patterns", failure: "Conversational Amnesia (Statelessness)", lens: "Privacy (Right to be Forgotten)", domain: "Application Layer", status: "locked" },
   { id: "026", title: "Evaluating Generative Models (Beyond Accuracy)", failure: "The 'Vibe Check' Trap", lens: "Human Factors", domain: "MLOps", status: "locked" },

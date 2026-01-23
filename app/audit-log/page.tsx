@@ -21,8 +21,8 @@ export default function AuditLogPage() {
                 <AlertCircle size={16} /> Latest Event: Content Release
               </div>
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                Jan 22, 2026: Released &quot;Prompt Engineering I: Structure & Context&quot;. 
-                Focused on preventing Garbage In, Garbage Out (Ambiguity) via Human Factors strategies.
+                Jan 23, 2026: Released &quot;Prompt Engineering II: Reasoning (CoT & ReAct)&quot;. 
+                Focused on preventing Logic Hallucination via Safety strategies.
               </p>
             </div>
             
@@ -36,6 +36,12 @@ export default function AuditLogPage() {
                     </tr>
                 </thead>
                 <tbody>
+                    <tr>
+                        <td>2026-01-23</td>
+                        <td><span className={styles.tag}>CONTENT</span></td>
+                        <td>Release Day 023</td>
+                        <td className="font-mono text-micro">e3d1...8f22</td>
+                    </tr>
                     <tr>
                         <td>2026-01-22</td>
                         <td><span className={styles.tag}>CONTENT</span></td>
