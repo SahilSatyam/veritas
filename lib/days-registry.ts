@@ -1,12 +1,9 @@
-export type DayStatus = "done" | "locked";
-
 export interface DayRegistryItem {
   id: string;
   title: string;
   failure: string;
   lens: string;
   domain: string;
-  status: DayStatus;
 }
 
 export const daysRegistry: DayRegistryItem[] = [
@@ -16,7 +13,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Dependency Hell",
     lens: "Reproducibility",
     domain: "MLOps",
-    status: "done",
   },
   {
     id: "002",
@@ -24,7 +20,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Silent Drift",
     lens: "Reproducibility",
     domain: "Data Infra",
-    status: "done",
   },
   {
     id: "003",
@@ -32,7 +27,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Environment Skew",
     lens: "Production",
     domain: "Infra",
-    status: "done",
   },
   {
     id: "004",
@@ -40,7 +34,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Silent Logic Failure",
     lens: "Safety",
     domain: "QA",
-    status: "done",
   },
   {
     id: "005",
@@ -48,7 +41,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Zombie Models",
     lens: "Reproducibility",
     domain: "MLOps",
-    status: "done",
   },
   {
     id: "006",
@@ -56,7 +48,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Digital Redlining",
     lens: "Safety",
     domain: "Data Science",
-    status: "done",
   },
   {
     id: "007",
@@ -64,7 +55,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Data Leakage",
     lens: "Reproducibility",
     domain: "Data Science",
-    status: "done",
   },
   {
     id: "008",
@@ -72,7 +62,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Complexity Tax",
     lens: "Governance",
     domain: "Data Science",
-    status: "done",
   },
   {
     id: "009",
@@ -80,7 +69,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Metric Misalignment",
     lens: "Production",
     domain: "Data Science",
-    status: "done",
   },
   {
     id: "010",
@@ -88,7 +76,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Temporal Leakage",
     lens: "Security",
     domain: "Data Science",
-    status: "done",
   },
   {
     id: "011",
@@ -96,7 +83,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Deployment of Discriminatory Models",
     lens: "Ethics",
     domain: "Model Evaluation",
-    status: "done",
   },
   {
     id: "012",
@@ -104,7 +90,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Stakeholder Rejection (The Black Box Problem)",
     lens: "Human Factors",
     domain: "Model Evaluation",
-    status: "done",
   },
   {
     id: "013",
@@ -112,7 +97,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Regulatory Non-Compliance (GDPR/CCPA)",
     lens: "Governance",
     domain: "Data Engineering",
-    status: "done",
   },
   {
     id: "014",
@@ -120,7 +104,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Model Misuse & Context Collapse",
     lens: "Ethics",
     domain: "Governance",
-    status: "done",
   },
   {
     id: "015",
@@ -128,7 +111,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Architectural Mismatch & Cost Blowout",
     lens: "Security",
     domain: "LLMs / Generative AI",
-    status: "done",
   },
   {
     id: "016",
@@ -136,7 +118,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Bill Shock & Resource Starvation",
     lens: "Sustainability",
     domain: "Infrastructure",
-    status: "done",
   },
   {
     id: "017",
@@ -144,7 +125,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Manual Deployment Errors",
     lens: "Security",
     domain: "MLOps",
-    status: "done",
   },
   {
     id: "018",
@@ -152,7 +132,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "The 'Orphan Model' (Provenance Collapse)",
     lens: "Governance",
     domain: "Data Engineering",
-    status: "done",
   },
   {
     id: "019",
@@ -160,7 +139,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Project Cancellation (The 'Science Project' Trap)",
     lens: "Ethics",
     domain: "Strategy",
-    status: "done",
   },
   {
     id: "020",
@@ -168,7 +146,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Integration Hell (Fragmented Architecture)",
     lens: "Reproducibility",
     domain: "Orchestration",
-    status: "done",
   },
   {
     id: "021",
@@ -176,7 +153,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Vendor Lock-in",
     lens: "Governance",
     domain: "MLOps",
-    status: "done",
   },
   {
     id: "022",
@@ -184,7 +160,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Garbage In, Garbage Out (Ambiguity)",
     lens: "Human Factors",
     domain: "MLOps",
-    status: "done",
   },
   {
     id: "023",
@@ -192,7 +167,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Logic Hallucination",
     lens: "Safety",
     domain: "LLMs",
-    status: "done",
   },
   {
     id: "024",
@@ -200,7 +174,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Pipeline Breaks (Parser Errors)",
     lens: "Security",
     domain: "MLOps",
-    status: "done",
   },
   {
     id: "025",
@@ -208,7 +181,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Conversational Amnesia (Statelessness)",
     lens: "Privacy (Right to be Forgotten)",
     domain: "Application Layer",
-    status: "locked",
   },
   {
     id: "026",
@@ -216,7 +188,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "The 'Vibe Check' Trap",
     lens: "Human Factors",
     domain: "MLOps",
-    status: "locked",
   },
   {
     id: "027",
@@ -224,7 +195,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Scaling Bottlenecks (The Human Review Queue)",
     lens: "Governance",
     domain: "MLOps",
-    status: "locked",
   },
   {
     id: "028",
@@ -232,7 +202,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "The Synonym Gap (Keyword Mismatch)",
     lens: "Ethics (Algorithmic Bias)",
     domain: "RAG / Search",
-    status: "locked",
   },
   {
     id: "029",
@@ -240,7 +209,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Latency Spikes (The O(N) Bottleck)",
     lens: "Security (Tenant Isolation)",
     domain: "Infrastructure / RAG",
-    status: "locked",
   },
   {
     id: "030",
@@ -248,7 +216,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Context Fragmentation",
     lens: "Governance (Data Lineage)",
     domain: "RAG / Data Engineering",
-    status: "locked",
   },
   {
     id: "031",
@@ -256,7 +223,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Semantic Drift (The Specificity Trap)",
     lens: "Reliability",
     domain: "RAG / Search",
-    status: "locked",
   },
   {
     id: "032",
@@ -264,7 +230,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Hallucinations masked as facts",
     lens: "Ethics",
     domain: "LLMs",
-    status: "locked",
   },
   {
     id: "033",
@@ -272,7 +237,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Vibes-based Deployment",
     lens: "Governance",
     domain: "MLOps",
-    status: "locked",
   },
   {
     id: "034",
@@ -280,7 +244,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "The Zero-Result Problem",
     lens: "Human Factors",
     domain: "LLMs",
-    status: "locked",
   },
   {
     id: "035",
@@ -288,7 +251,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Bill Shock & Latency",
     lens: "Security",
     domain: "MLOps",
-    status: "locked",
   },
   {
     id: "036",
@@ -296,7 +258,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Black Box Debugging",
     lens: "Privacy",
     domain: "MLOps",
-    status: "locked",
   },
   {
     id: "037",
@@ -304,7 +265,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "The DAN Attack",
     lens: "Security",
     domain: "LLMs",
-    status: "locked",
   },
   {
     id: "038",
@@ -312,7 +272,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Data Leaks to Third Parties",
     lens: "Governance",
     domain: "Security",
-    status: "locked",
   },
   {
     id: "039",
@@ -320,7 +279,6 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Metadata Explosion",
     lens: "Security",
     domain: "Data Infra",
-    status: "locked",
   },
   {
     id: "040",
@@ -328,11 +286,56 @@ export const daysRegistry: DayRegistryItem[] = [
     failure: "Over-engineered RAG",
     lens: "Business Strategy",
     domain: "MLOps",
-    status: "locked",
   },
 ];
 
+/**
+ * Calculates the day of the year (1-365) for a given date in 2026.
+ * January 1st = 1, January 25th = 25, February 1st = 32, etc.
+ * 2026 is not a leap year, so there are 365 days.
+ */
+export function getDayOfYear2026(date: Date = new Date()): number {
+  // Create the start of year 2026 in the same timezone
+  const startOf2026 = new Date(date.getFullYear(), 0, 1); // January 1st of the current year
+  
+  // If we want to strictly enforce 2026 calendar
+  if (date.getFullYear() !== 2026) {
+    // If before 2026, no days unlocked; if after 2026, all days unlocked
+    if (date.getFullYear() < 2026) return 0;
+    if (date.getFullYear() > 2026) return 365;
+  }
+  
+  // Calculate the difference in days
+  const diffTime = date.getTime() - startOf2026.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  
+  // Add 1 because January 1st should be day 1, not day 0
+  return diffDays + 1;
+}
+
+/**
+ * Checks if a day should be unlocked based on the current date.
+ * A day is unlocked if its ID (as a number) is less than or equal to
+ * the current day of the year in 2026.
+ * 
+ * Examples (for 2026 calendar):
+ * - January 25th unlocks day 025
+ * - February 1st unlocks day 032 (31 days of January + 1)
+ */
 export function isDayUnlocked(id: string): boolean {
   const day = daysRegistry.find((d) => d.id === id);
-  return day?.status === "done";
+  if (!day) return false;
+  
+  const dayNumber = parseInt(id, 10);
+  const currentDayOfYear = getDayOfYear2026();
+  
+  return dayNumber <= currentDayOfYear;
+}
+
+/**
+ * Returns the count of unlocked days based on the current date.
+ */
+export function getUnlockedDaysCount(): number {
+  const currentDayOfYear = getDayOfYear2026();
+  return daysRegistry.filter((d) => parseInt(d.id, 10) <= currentDayOfYear).length;
 }

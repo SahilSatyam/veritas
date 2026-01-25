@@ -1,19 +1,19 @@
 "use client";
 
 import styles from "./page.module.css";
-import { CheckCircle2, Circle, Lock } from "lucide-react";
+import { CheckCircle2, Lock } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import LensTag from "../components/LensTag";
 
-import { daysRegistry as days } from "../../lib/days-registry";
+import { daysRegistry as days, isDayUnlocked, getUnlockedDaysCount } from "../../lib/days-registry";
 
 export default function IndexPage() {
   const [activeLens, setActiveLens] = useState("All");
 
   const lenses = ["All", "Reproducibility", "Safety", "Governance", "Production", "Security"];
 
-  const completedDays = days.filter(d => d.status === "done").length;
+  const completedDays = getUnlockedDaysCount();
 
   return (
     <div className="container">
@@ -71,30 +71,31 @@ export default function IndexPage() {
             </tr>
           </thead>
           <tbody>
-            {days.filter(d => activeLens === "All" || d.lens === activeLens).map((day) => (
-              <tr key={day.id}>
-                <td className="font-mono text-secondary">{day.id}</td>
-                <td>
-                  {day.status === "locked" ? (
-                    <span className="text-secondary" style={{ fontWeight: 500, opacity: 0.5 }}>{day.title}</span>
-                  ) : (
-                    <Link href={`/day/${day.id}`} style={{ fontWeight: 500 }}>{day.title}</Link>
-                  )}
-                </td>
-                <td className="text-secondary">{day.failure}</td>
-                <td><LensTag>{day.lens}</LensTag></td>
-                <td><span className="text-micro">{day.domain}</span></td>
-                <td>
-                  {day.status === "done" ? (
-                    <CheckCircle2 size={18} className={styles.statusIcon} />
-                  ) : day.status === "locked" ? (
-                    <Lock size={18} className="text-secondary" style={{ opacity: 0.5 }} />
-                  ) : (
-                    <Circle size={18} color="#E5E5E0" />
-                  )}
-                </td>
-              </tr>
-            ))}
+            {days.filter(d => activeLens === "All" || d.lens === activeLens).map((day) => {
+              const isUnlocked = isDayUnlocked(day.id);
+              return (
+                <tr key={day.id}>
+                  <td className="font-mono text-secondary">{day.id}</td>
+                  <td>
+                    {!isUnlocked ? (
+                      <span className="text-secondary" style={{ fontWeight: 500, opacity: 0.5 }}>{day.title}</span>
+                    ) : (
+                      <Link href={`/day/${day.id}`} style={{ fontWeight: 500 }}>{day.title}</Link>
+                    )}
+                  </td>
+                  <td className="text-secondary">{day.failure}</td>
+                  <td><LensTag>{day.lens}</LensTag></td>
+                  <td><span className="text-micro">{day.domain}</span></td>
+                  <td>
+                    {isUnlocked ? (
+                      <CheckCircle2 size={18} className={styles.statusIcon} />
+                    ) : (
+                      <Lock size={18} className="text-secondary" style={{ opacity: 0.5 }} />
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
