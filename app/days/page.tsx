@@ -3,17 +3,31 @@
 import styles from "./page.module.css";
 import { CheckCircle2, Lock } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import LensTag from "../components/LensTag";
 
 import { daysRegistry as days, isDayUnlocked, getUnlockedDaysCount } from "../../lib/days-registry";
 
+type SortOrder = "asc" | "desc";
+
 export default function IndexPage() {
   const [activeLens, setActiveLens] = useState("All");
+  const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
 
   const lenses = ["All", "Reproducibility", "Safety", "Governance", "Production", "Security"];
 
   const completedDays = getUnlockedDaysCount();
+
+  // Filter and sort days based on current settings
+  const filteredAndSortedDays = useMemo(() => {
+    const filtered = days.filter(d => activeLens === "All" || d.lens === activeLens);
+    
+    return [...filtered].sort((a, b) => {
+      const aNum = parseInt(a.id, 10);
+      const bNum = parseInt(b.id, 10);
+      return sortOrder === "asc" ? aNum - bNum : bNum - aNum;
+    });
+  }, [activeLens, sortOrder]);
 
   return (
     <div className="container">
@@ -38,9 +52,13 @@ export default function IndexPage() {
       <div className={styles.filterBar}>
         <div className={styles.searchRow}>
           <input type="text" placeholder="Search titles or failures..." className={styles.searchInput} />
-          <select className={styles.sortSelect}>
-            <option>Day Number (Asc)</option>
-            <option>Day Number (Desc)</option>
+          <select 
+            className={styles.sortSelect}
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as SortOrder)}
+          >
+            <option value="asc">Day Number (Asc)</option>
+            <option value="desc">Day Number (Desc)</option>
           </select>
         </div>
 
@@ -71,7 +89,7 @@ export default function IndexPage() {
             </tr>
           </thead>
           <tbody>
-            {days.filter(d => activeLens === "All" || d.lens === activeLens).map((day) => {
+            {filteredAndSortedDays.map((day) => {
               const isUnlocked = isDayUnlocked(day.id);
               return (
                 <tr key={day.id}>
@@ -102,3 +120,4 @@ export default function IndexPage() {
     </div>
   );
 }
+
