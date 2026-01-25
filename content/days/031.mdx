@@ -17,7 +17,7 @@ Vector search is excellent at understanding _concepts_ ("network issue") but ter
 
 ### 1. Why This Topic Matters
 
-In Day 28, we learned that vectors map meaning. But sometimes, meaning isn't enough.
+In Days 28-29, we learned that embeddings map meaning and vector databases enable fast retrieval. But sometimes, semantic meaning isn't enough.
 
 - **Query:** "iphone 15 pro max case"
 - **Vector Result:** "iphone 14 pro case" (Semantically 99% similar: both are phone cases for high-end Apple phones).
@@ -167,6 +167,10 @@ def reciprocal_rank_fusion(list_a_ranks, list_b_ranks, k=60):
 - **Re-ranking Everything:** Do not re-rank the entire database. You must retrieve a candidate set (Top 50) first. Cross-encoding 1 million documents takes hours.
 - **Ignoring Length:** Cross-encoders have a token limit (usually 512). If you pass a 2,000-token document, it truncates. Ensure you re-rank _chunks_, not full PDFs.
 
+### 9. Next Steps
+
+1. **Audit:** Review your current retrieval. Are you losing precision on keyword-heavy queries (product SKUs, error codes)?
+2. **Implement:** Add BM25 (Sparse) alongside your Vector Search (Dense) and use RRF to merge.
 3. **Upgrade:** If precision is still low, deploy a dedicated Cross-Encoder service (e.g., a small Docker container running HuggingFace Inference).
 
 ### Coming Up Next
