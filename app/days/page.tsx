@@ -13,6 +13,7 @@ type SortOrder = "asc" | "desc";
 export default function IndexPage() {
   const [activeLens, setActiveLens] = useState("All");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const lenses = ["All", "Reproducibility", "Safety", "Governance", "Production", "Security"];
 
@@ -20,14 +21,29 @@ export default function IndexPage() {
 
   // Filter and sort days based on current settings
   const filteredAndSortedDays = useMemo(() => {
-    const filtered = days.filter(d => activeLens === "All" || d.lens === activeLens);
+    const query = searchQuery.toLowerCase().trim();
+    
+    const filtered = days.filter(d => {
+      // Apply lens filter
+      const matchesLens = activeLens === "All" || d.lens === activeLens;
+      
+      // Apply search filter (searches title, failure, domain, and lens)
+      const matchesSearch = query === "" || 
+        d.title.toLowerCase().includes(query) ||
+        d.failure.toLowerCase().includes(query) ||
+        d.domain.toLowerCase().includes(query) ||
+        d.lens.toLowerCase().includes(query) ||
+        d.id.includes(query);
+      
+      return matchesLens && matchesSearch;
+    });
     
     return [...filtered].sort((a, b) => {
       const aNum = parseInt(a.id, 10);
       const bNum = parseInt(b.id, 10);
       return sortOrder === "asc" ? aNum - bNum : bNum - aNum;
     });
-  }, [activeLens, sortOrder]);
+  }, [activeLens, sortOrder, searchQuery]);
 
   return (
     <div className="container">
@@ -51,7 +67,13 @@ export default function IndexPage() {
 
       <div className={styles.filterBar}>
         <div className={styles.searchRow}>
-          <input type="text" placeholder="Search titles or failures..." className={styles.searchInput} />
+          <input 
+            type="text" 
+            placeholder="Search titles or failures..." 
+            className={styles.searchInput}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
           <select 
             className={styles.sortSelect}
             value={sortOrder}
