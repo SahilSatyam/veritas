@@ -1,7 +1,11 @@
 import styles from "../page.module.css";
 import { AlertCircle } from "lucide-react";
+import { getAuditLogEntries, getLatestAuditLogEntry } from "../../lib/days-registry";
 
 export default function AuditLogPage() {
+  const auditEntries = getAuditLogEntries();
+  const latestEntry = getLatestAuditLogEntry();
+
   return (
     <div className="container">
       <div className={styles.section}>
@@ -16,15 +20,17 @@ export default function AuditLogPage() {
           </p>
           
           <div style={{ marginTop: "3rem" }}>
-            <div className={styles.auditNote}>
-              <div className={styles.auditTitle}>
-                <AlertCircle size={16} /> Latest Event: Content Release
+            {latestEntry && (
+              <div className={styles.auditNote}>
+                <div className={styles.auditTitle}>
+                  <AlertCircle size={16} /> Latest Event: Content Release
+                </div>
+                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                  {latestEntry.displayDate}: Released &quot;{latestEntry.dayTitle}&quot;. 
+                  Focused on preventing {latestEntry.dayFailure} via {latestEntry.dayLens} strategies.
+                </p>
               </div>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                Jan 24, 2026: Released &quot;Structured Outputs (JSON Mode & Function Calling)&quot;. 
-                Focused on preventing Pipeline Breaks (Parser Errors) via Security strategies.
-              </p>
-            </div>
+            )}
             
             <table className={styles.previewTable}>
                 <thead>
@@ -36,150 +42,14 @@ export default function AuditLogPage() {
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
-                        <td>2026-01-24</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 024</td>
-                        <td className="font-mono text-micro">df30...2b11</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-23</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 023</td>
-                        <td className="font-mono text-micro">e3d1...8f22</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-22</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 022</td>
-                        <td className="font-mono text-micro">f2e3...1c99</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-21</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 021</td>
-                        <td className="font-mono text-micro">d7e2...5f33</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-20</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 020</td>
-                        <td className="font-mono text-micro">b9c5...6e44</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-19</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 019</td>
-                        <td className="font-mono text-micro">a8b4...5d33</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-18</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 018</td>
-                        <td className="font-mono text-micro">f7a3...2c11</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-17</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 017</td>
-                        <td className="font-mono text-micro">e6c1...9a22</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-16</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 016</td>
-                        <td className="font-mono text-micro">c9e2...3f55</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-15</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 015</td>
-                        <td className="font-mono text-micro">b7d1...4e22</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-14</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 014</td>
-                        <td className="font-mono text-micro">a4b2...8e99</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-13</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 013</td>
-                        <td className="font-mono text-micro">e6c9...1a77</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-12</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 012</td>
-                        <td className="font-mono text-micro">d8a1...2f44</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-11</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 011</td>
-                        <td className="font-mono text-micro">f9b2...3c11</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-10</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 010</td>
-                        <td className="font-mono text-micro">c5e1...9d88</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-09</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 009</td>
-                        <td className="font-mono text-micro">a2c4...e5b8</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-08</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 008</td>
-                        <td className="font-mono text-micro">f7c3...1a44</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-07</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 007</td>
-                        <td className="font-mono text-micro">b4e2...8f91</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-06</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 006</td>
-                        <td className="font-mono text-micro">d3a9...5c77</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-05</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 005</td>
-                        <td className="font-mono text-micro">f1a8...7b22</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-04</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 004</td>
-                        <td className="font-mono text-micro">c8d4...3f55</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-03</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 003</td>
-                        <td className="font-mono text-micro">e5f1...2b99</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-02</td>
-                        <td><span className={styles.tag}>CONTENT</span></td>
-                        <td>Release Day 002</td>
-                        <td className="font-mono text-micro">b9f2...4a11</td>
-                    </tr>
-                    <tr>
-                        <td>2026-01-01</td>
-                        <td><span className={styles.tag}>INIT</span></td>
-                        <td>Initial Commit & Day 001</td>
-                        <td className="font-mono text-micro">a7b3...9c21</td>
-                    </tr>
+                    {auditEntries.map((entry) => (
+                      <tr key={entry.dayId}>
+                        <td>{entry.date}</td>
+                        <td><span className={styles.tag}>{entry.eventType}</span></td>
+                        <td>{entry.description}</td>
+                        <td className="font-mono text-micro">{entry.hash}</td>
+                      </tr>
+                    ))}
                 </tbody>
             </table>
 

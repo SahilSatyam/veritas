@@ -339,3 +339,123 @@ export function getUnlockedDaysCount(): number {
   const currentDayOfYear = getDayOfYear2026();
   return daysRegistry.filter((d) => parseInt(d.id, 10) <= currentDayOfYear).length;
 }
+
+/**
+ * Represents an audit log entry for a day release.
+ */
+export interface AuditLogEntry {
+  date: string;          // Format: "2026-01-25"
+  displayDate: string;   // Format: "Jan 25, 2026"
+  eventType: "INIT" | "CONTENT";
+  description: string;
+  hash: string;
+  dayId: string;
+  dayTitle: string;
+  dayFailure: string;
+  dayLens: string;
+}
+
+/**
+ * Generates a deterministic pseudo-hash for a day based on its ID.
+ * This creates consistent hashes that look realistic.
+ */
+function generateDayHash(dayId: string): string {
+  const hashChars = "0123456789abcdef";
+  let hash = "";
+  const seed = parseInt(dayId, 10);
+  
+  // Generate first 4 chars
+  for (let i = 0; i < 4; i++) {
+    hash += hashChars[(seed * (i + 1) * 7 + i * 3) % 16];
+  }
+  hash += "...";
+  // Generate last 4 chars
+  for (let i = 0; i < 4; i++) {
+    hash += hashChars[(seed * (i + 5) * 11 + i * 13) % 16];
+  }
+  
+  return hash;
+}
+
+/**
+ * Converts a day of year (1-365) to a Date object in 2026.
+ */
+function dayOfYearToDate(dayOfYear: number): Date {
+  const date = new Date(2026, 0, 1); // January 1, 2026
+  date.setDate(dayOfYear);
+  return date;
+}
+
+/**
+ * Formats a date as "2026-01-25" (ISO format without time).
+ */
+function formatDateISO(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Formats a date as "Jan 25, 2026".
+ */
+function formatDateDisplay(date: Date): string {
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const month = months[date.getMonth()];
+  const day = date.getDate();
+  const year = date.getFullYear();
+  return `${month} ${day}, ${year}`;
+}
+
+/**
+ * Generates audit log entries for all unlocked days.
+ * Returns entries in reverse chronological order (newest first).
+ * 
+ * Each day corresponds to a specific date in 2026:
+ * - Day 001 = January 1, 2026
+ * - Day 025 = January 25, 2026
+ * - Day 032 = February 1, 2026
+ */
+export function getAuditLogEntries(): AuditLogEntry[] {
+  const currentDayOfYear = getDayOfYear2026();
+  const entries: AuditLogEntry[] = [];
+  
+  // Get all unlocked days
+  const unlockedDays = daysRegistry.filter(
+    (d) => parseInt(d.id, 10) <= currentDayOfYear
+  );
+  
+  // Generate entries for each unlocked day
+  for (const day of unlockedDays) {
+    const dayNumber = parseInt(day.id, 10);
+    const releaseDate = dayOfYearToDate(dayNumber);
+    
+    entries.push({
+      date: formatDateISO(releaseDate),
+      displayDate: formatDateDisplay(releaseDate),
+      eventType: dayNumber === 1 ? "INIT" : "CONTENT",
+      description: dayNumber === 1 
+        ? `Initial Commit & Day ${day.id}`
+        : `Release Day ${day.id}`,
+      hash: generateDayHash(day.id),
+      dayId: day.id,
+      dayTitle: day.title,
+      dayFailure: day.failure,
+      dayLens: day.lens,
+    });
+  }
+  
+  // Sort by day number descending (newest first)
+  entries.sort((a, b) => parseInt(b.dayId, 10) - parseInt(a.dayId, 10));
+  
+  return entries;
+}
+
+/**
+ * Gets the latest audit log entry (most recently released day).
+ */
+export function getLatestAuditLogEntry(): AuditLogEntry | null {
+  const entries = getAuditLogEntries();
+  return entries.length > 0 ? entries[0] : null;
+}
