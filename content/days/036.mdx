@@ -1,0 +1,233 @@
+---
+title: "Observability for Chains (Tracing)"
+failure: "Black Box Debugging"
+lens: "Privacy"
+domain: "MLOps"
+day: "036"
+status: "locked"
+tags: ["Observability", "OpenTelemetry", "Tracing", "Debugging"]
+date: "2026-02-05"
+---
+
+### Abstract
+
+In deterministic software, a stack trace is usually sufficient to identify the root cause of a failure. In probabilistic AI systems, a "crash" is the least worrying failure mode. The real dangers are silent failures: a retrieval step that returns zero documents, a prompt template that truncates the context, or a model that drifts in latency. Without **Distributed Tracing**, an LLM application is a black box where input goes in and (maybe) output comes out. This post establishes the architecture for deep observability using OpenTelemetry (OTel), moving beyond simple logging to hierarchical, time-bound spans that visualize the exact execution path of a cognitive chain.
+
+### 1. Why This Topic Matters
+
+When a user reports, "The bot gave me the wrong answer," and you cannot immediately see the _exact_ retrieved documents, the prompt sent to the LLM, and the raw model output, you are not engineering; you are guessing.
+
+"Black Box Debugging" is a primary cause of slow Mean Time To Recovery (MTTR). In production RAG systems, latency spikes often originate in the vector database, not the LLM. Hallucinations often originate in the retrieval step, not the generation. Tracing allows you to dissect the anatomy of a request, isolating the fault domain instantly.
+
+### 2. Core Concepts & Mental Models
+
+- **Traces vs. Logs**:
+- _Log_: An isolated event (`INFO: Request received`).
+- _Trace_: A causal chain of events (`Request received` $\to$ `Embed Query` $\to$ `Vector Search` $\to$ `LLM Call` $\to$ `Response`).
+
+- **Spans**: The building blocks of a trace. A span represents a unit of work (e.g., "Retrieve Documents"). It has a start time, end time, inputs, outputs, and metadata.
+- **The Waterfall View**: Visualizing spans as cascading bars helps identify bottlenecks. If the "Vector Search" span is 2 seconds long, no amount of prompt engineering will fix your latency.
+- **Tags & Attributes**: Attaching business logic to spans (e.g., `user_id`, `experiment_group`, `model_version`).
+
+### 3. Theoretical Foundations
+
+We align with **OpenTelemetry (OTel)**, the industry standard for observability.
+
+An LLM chain is a Directed Acyclic Graph (DAG) of execution.
+$$Trace = \{Span_1, Span_2, ..., Span_N\}$$
+
+Where $Span_i$ references $Span_j$ via a `parent_id`.
+In RAG, the structure is typically:
+
+1. `Root`: "Chat Request"
+2. $\to$ `Child`: "Retrieve Context" (Input: Query, Output: Docs)
+3. $\to$ `Child`: "Generate Answer" (Input: Prompt+Docs, Output: Text)
+
+### 4. Production-Grade Implementation
+
+**The Privacy Trade-off (Redaction)**
+Tracing full payloads (inputs and outputs) is powerful for debugging but dangerous for privacy. If a user pastes a credit card number, and you log the prompt to your observability backend (e.g., LangSmith, Arize, Datadog), you have created a PII leak.
+
+**Solution**: Implement a **Redaction Middleware** in your tracer. Use regex or PII-detection models (like Microsoft Presidio) to scrub sensitive patterns _before_ the span data leaves the application memory.
+
+### 5. Hands-On Project / Exercise
+
+**Objective**: Instrument a logical RAG chain using a custom tracing wrapper (simulating OTel logic) that clearly distinguishes a failure in the "Retrieval" step from the "Generation" step.
+
+**Constraints**:
+
+- Must implement a `Trace` and `Span` context manager.
+- Must capture inputs/outputs for debugging.
+- Must simulate a failure to demonstrate fault isolation.
+
+#### The Implementation
+
+```python
+import time
+import uuid
+import json
+from contextlib import contextmanager
+from typing import Optional, Dict, Any
+
+# --- Minimal OTel-style Tracing Framework ---
+
+class Span:
+    def __init__(self, name: str, parent_id: Optional[str] = None):
+        self.id = str(uuid.uuid4())[:8]
+        self.name = name
+        self.parent_id = parent_id
+        self.start_time = None
+        self.end_time = None
+        self.status = "OK"
+        self.attributes: Dict[str, Any] = {}
+        self.error: Optional[str] = None
+
+    def set_attribute(self, key: str, value: Any):
+        # PII REDACTION LAYER (Simplified)
+        if key in ["input", "output"] and isinstance(value, str):
+            if "password" in value.lower():
+                value = "[REDACTED]"
+        self.attributes[key] = value
+
+    def to_dict(self):
+        duration = (self.end_time - self.start_time) * 1000 if self.end_time else 0
+        return {
+            "span_id": self.id,
+            "parent_id": self.parent_id,
+            "name": self.name,
+            "duration_ms": f"{duration:.2f}",
+            "status": self.status,
+            "error": self.error,
+            "attributes": self.attributes
+        }
+
+class Tracer:
+    def __init__(self):
+        self.active_span_stack = []
+        self.spans = []
+
+    @contextmanager
+    def start_span(self, name: str):
+        parent_id = self.active_span_stack[-1].id if self.active_span_stack else None
+        span = Span(name, parent_id)
+        span.start_time = time.time()
+
+        self.active_span_stack.append(span)
+        try:
+            yield span
+        except Exception as e:
+            span.status = "ERROR"
+            span.error = str(e)
+            raise e # Re-raise to handle in outer scope
+        finally:
+            span.end_time = time.time()
+            self.spans.append(span)
+            self.active_span_stack.pop()
+
+    def print_trace(self):
+        print("\n--- TRACE VISUALIZATION ---")
+        # Sort by start time to show flow
+        sorted_spans = sorted(self.spans, key=lambda s: s.start_time)
+        for s in sorted_spans:
+            indent = "  " * (1 if s.parent_id else 0) # Simple nesting viz
+            status_icon = "❌" if s.status == "ERROR" else "✅"
+            print(f"{indent}{status_icon} [{s.name}] ({s.duration_ms}ms)")
+            if s.error:
+                print(f"{indent}   Startling Failure: {s.error}")
+            if "input" in s.attributes:
+                print(f"{indent}   Input: {s.attributes['input']}")
+
+# --- The RAG Chain ---
+
+tracer = Tracer()
+
+class RAGService:
+    def __init__(self):
+        self.db_status = "offline" # Simulate broken DB
+
+    def retrieve(self, query: str):
+        with tracer.start_span("Retrieval Step") as span:
+            span.set_attribute("input", query)
+            time.sleep(0.1) # Simulate network
+
+            if self.db_status == "offline":
+                raise ConnectionError("Vector Database Unreachable")
+
+            return "Relevant Document Content"
+
+    def generate(self, query: str, context: str):
+        with tracer.start_span("Generation Step") as span:
+            span.set_attribute("model", "gpt-4-turbo")
+            span.set_attribute("input", f"Q: {query} C: {context}")
+            time.sleep(0.5) # Simulate generation
+            return "Final Answer"
+
+    def run_chain(self, query: str):
+        print(f"Processing Query: {query}")
+        try:
+            with tracer.start_span("RAG Chain Root") as root_span:
+                root_span.set_attribute("user_id", "user_123")
+
+                # Step 1: Retrieval
+                context = self.retrieve(query)
+                root_span.set_attribute("retrieved_context_len", len(context))
+
+                # Step 2: Generation
+                answer = self.generate(query, context)
+                return answer
+
+        except Exception as e:
+            print(f"⚠️ Chain Halted: {e}")
+
+# --- Execution ---
+
+service = RAGService()
+
+# This run will fail at Retrieval.
+# The trace will clearly show the Root started, Retrieval failed, and Generation never happened.
+service.run_chain("What is the refund policy?")
+
+tracer.print_trace()
+
+```
+
+#### Output Analysis
+
+The output will visually demonstrate:
+
+1. `RAG Chain Root` started.
+2. `Retrieval Step` started, failed (❌), and bubbled the error.
+3. `Generation Step` is **missing** from the trace.
+   This immediately tells the engineer: "The model didn't fail; the code never even reached the model."
+
+### 6. Ethical, Security & Safety Considerations
+
+- **PII Sanitization**: As shown in the code `[REDACTED]`, you must assume all user input is toxic/private until proven otherwise. Never log raw prompts to a third-party SaaS without scrubbing.
+- **Data Residency**: Many tracing tools are cloud-hosted (SaaS). If you are in healthcare (HIPAA) or finance, sending full prompt traces to a US-hosted SaaS might violate data residency laws. Use self-hosted instances (e.g., self-hosted Arize Phoenix or Jaeger) for sensitive workloads.
+
+### 7. Business & Strategic Implications
+
+- **Cost of Observability**: Tracing adds overhead. Logging full request/response bodies consumes massive storage.
+- _Strategy_: Use **Head-Based Sampling**. Trace 100% of errors, but only 5% of successful requests in production.
+
+- **A/B Testing Platform**: Tracing is the foundation of experimentation. By tagging spans with `experiment_id: "prompt_v2"`, you can correlate changes in code with changes in user feedback metrics later in the pipeline.
+
+### 8. Common Pitfalls & Misconceptions
+
+- **Tracing Everything**: Do not trace every internal variable assignment. Trace boundaries (Network calls, Model calls, Disk I/O). Over-tracing creates noise.
+- **Confusing Logs with Traces**: "I have logs" is not enough. Logs lack context. If you see an error log `Timeout`, but don't know it happened inside the `Retry` loop of the `Embedding` service, you are blind.
+
+### 9. Prerequisites & Next Steps
+
+- **Prerequisite**: Basic understanding of decorators and context managers in Python.
+- **Next Step**: Now that we can see the errors, how do we stop them from reaching the user? Day 37 introduces **"Adversarial Defense"** to block malicious or malformed inputs before they even start a trace.
+
+### Coming Up Next
+
+[Day 37: Adversarial Defense (Prompt Injection)](/days/037) - Implementing **Defense in Depth** strategies to prevent **Prompt Injection** and **Jailbreaking** attacks.
+
+### 10. Further Reading & Resources
+
+- **Standard**: _OpenTelemetry (OTel) Semantic Conventions for LLMs_.
+- **Tools**: _LangSmith_ (LangChain), _Arize Phoenix_ (Open Source), _Lunary_.
+- **Concept**: _Distributed Tracing in Microservices_.

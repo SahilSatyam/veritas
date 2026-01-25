@@ -1,0 +1,194 @@
+---
+title: "The Fine-Tuning Pivot (Build vs. Buy)"
+failure: "Over-engineered RAG"
+lens: "Business Strategy"
+domain: "MLOps"
+day: "040"
+status: "locked"
+tags: ["LoRA", "QLoRA", "Fine-Tuning", "Strategy", "Cost Optimization"]
+date: "2026-02-09"
+---
+
+### Abstract
+
+A common anti-pattern in AI engineering is "Prompt Engineering until the heat death of the universe." Teams spend months constructing 3,000-token prompts, implementing complex retry logic for JSON parsing, and burning cash on GPT-4—all to force a model to output a specific format or adopt a specific tone. This is the wrong tool for the job. RAG is for **Knowledge** (what the model knows). Fine-Tuning is for **Behavior** (how the model acts). This post details the "Fine-Tuning Pivot": the strategic decision to stop renting expensive generalist intelligence and instead build specialized, lightweight models using Parameter-Efficient Fine-Tuning (PEFT).
+
+### 1. Why This Topic Matters
+
+If you rely exclusively on prompt engineering and RAG, you are:
+
+1. **Overpaying**: Using a PhD-level model (GPT-4) to do a high-school level task (classification/formatting).
+2. **Latency-Bound**: sending huge system prompts (input tokens) costs time.
+3. **Vendor-Locked**: You cannot easily port a 50-shot prompt to a different provider.
+
+Fine-tuning allows you to distill the capabilities of a large model into a smaller, faster, cheaper one that you **own**.
+
+### 2. Core Concepts & Mental Models
+
+- **The Knowledge vs. Behavior Axis**:
+- _New Facts (Stock Prices, News)_ $\to$ **RAG**. (Fine-tuning is too slow to keep up).
+- _New Behavior (JSON formatting, Medical tone, SQL generation)_ $\to$ **Fine-Tuning**. (RAG is too fragile).
+
+- **PEFT (Parameter-Efficient Fine-Tuning)**: Instead of retraining the whole brain (70B params), we train a tiny "adapter" layer (LoRA) on top of it. This costs $5 instead of $50,000.
+- **Teacher-Student Distillation**: Use GPT-4 to generate perfect examples, then use those examples to train a small Llama-3-8B to do the same thing.
+
+### 3. Theoretical Foundations
+
+**LoRA (Low-Rank Adaptation)**
+Standard fine-tuning updates all weights $W$. LoRA freezes $W$ and injects trainable rank decomposition matrices $A$ and $B$:
+
+$$W' = W + \Delta W = W + AB^T$$
+
+Where $A$ and $B$ are tiny compared to $W$. This reduces trainable parameters by 10,000x, allowing you to fine-tune a 7B model on a single consumer GPU.
+
+**QLoRA**: Adds quantization (4-bit precision) to the frozen weights, further lowering memory requirements.
+
+### 4. Production-Grade Implementation
+
+**The Pivot Point**
+When should you switch from RAG/Prompting to Fine-Tuning?
+
+1. **Volume**: You run >10k requests/day (Cloud GPU cost savings kick in).
+2. **Latency**: You need <500ms response times (Small FT models are faster than huge prompted ones).
+3. **Strictness**: You need valid JSON 99.9% of the time, not 95%.
+
+**The Stack**:
+
+- **Base Model**: Llama-3-8B or Mistral-7B (The Engine).
+- **Dataset**: 500-1,000 high-quality input-output pairs (The Fuel).
+- **Library**: `Unsloth` (fastest) or `HuggingFace PEFT`.
+
+### 5. Hands-On Project / Exercise
+
+**Objective**: Fine-tune a small model (simulated) to be a "JSON-Speaking Machine." The base model chats normally; the fine-tuned model _only_ outputs valid JSON, even with short prompts.
+
+**Constraints**:
+
+- Use `peft` configuration.
+- Demonstrate the "Adapter" concept (switching behavior without reloading the model).
+
+#### The Implementation
+
+```python
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
+from peft import LoraConfig, get_peft_model, TaskType
+
+# --- 1. Configuration (The "Recipe") ---
+
+# Define the Low-Rank Adaptation (LoRA) config
+# This tells the system: "Don't touch the brain, just add a small skill layer."
+lora_config = LoraConfig(
+    r=8,                            # Rank: Mental capacity of the adapter (8 is usually enough for style)
+    lora_alpha=32,                  # Scaling factor
+    target_modules=["q_proj", "v_proj"], # Which layers to attach to (Attention mechanism)
+    lora_dropout=0.05,
+    bias="none",
+    task_type=TaskType.CAUSAL_LM
+)
+
+class FineTuner:
+    def __init__(self, model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0"):
+        print(f"Loading Base Model: {model_name}...")
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        # Load in 4-bit (QLoRA) typically, here using standard for simplicity
+        self.base_model = AutoModelForCausalLM.from_pretrained(model_name)
+
+    def apply_adapter(self):
+        """
+        Attaches the LoRA adapter. The model is now 'trainable' but
+        only the tiny adapter layers will change.
+        """
+        self.model = get_peft_model(self.base_model, lora_config)
+
+        # Visualize the parameter savings
+        trainable_params = 0
+        all_param = 0
+        for _, param in self.model.named_parameters():
+            all_param += param.numel()
+            if param.requires_grad:
+                trainable_params += param.numel()
+
+        print(f"\n--- PEFT Stats ---")
+        print(f"Trainable params: {trainable_params:,}")
+        print(f"All params: {all_param:,}")
+        print(f"Savings: We are training only {100 * trainable_params / all_param:.2f}% of the model.")
+
+    def simulate_training_loop(self, dataset):
+        """
+        Mocking the training loop to demonstrate data formatting.
+        Real training requires GPU and 10+ minutes.
+        """
+        print("\n--- Starting Training Loop (Simulated) ---")
+        print("Format: User Instruction -> JSON Output")
+
+        for i, example in enumerate(dataset[:2]):
+            prompt = f"User: {example['input']}\nAssistant:"
+            target = example['output']
+            print(f"Step {i+1}: Learning mapping...")
+            print(f"   In:  {prompt}")
+            print(f"   Out: {target}")
+
+        print("... Training Complete (Adapter Weights Updated) ...")
+
+    def inference(self, query):
+        # In a real scenario, this would generate based on the fine-tuned weights
+        print(f"\n[Inference] Query: '{query}'")
+        print("Response (Simulated JSON-Only Behavior):")
+        return f'{{"action": "response", "content": "{query} processed", "confidence": 0.99}}'
+
+# --- Execution ---
+
+# 1. Prepare Data (The "Textbook")
+# We want the model to output strict JSON for customer support routing.
+dataset = [
+    {"input": "My internet is down.", "output": "{\"category\": \"technical\", \"urgency\": \"high\"}"},
+    {"input": "Can I upgrade my plan?", "output": "{\"category\": \"sales\", \"urgency\": \"low\"}"}
+]
+
+# 2. Setup System
+tuner = FineTuner()
+
+# 3. Apply LoRA
+tuner.apply_adapter()
+
+# 4. Train
+tuner.simulate_training_loop(dataset)
+
+# 5. Use
+output = tuner.inference("I want to cancel my subscription.")
+print(output)
+
+```
+
+### 6. Ethical, Security & Safety Considerations
+
+- **Catastrophic Forgetting**: When you fine-tune a model to speak JSON, it might "forget" how to write poetry or Python code.
+- _Mitigation_: Only use the fine-tuned model for the specific task it was trained for. Do not treat it as a generalist anymore.
+
+- **Poisoning the Well**: If your training data contains bias (e.g., all "High Urgency" tickets come from male names), the model will bake this bias into its weights permanently. You must audit the training dataset, not just the model output.
+- **IP Ownership**: If you fine-tune Llama-3 on your proprietary data, who owns the resulting weights? Generally, you do. This is a massive strategic asset compared to sending data to OpenAI.
+
+### 7. Business & Strategic Implications
+
+- **The "Rent vs. Buy" Decision**:
+- _API (OpenAI)_: Renting intelligence. High variable cost (per token). Zero maintenance.
+- _Fine-Tuned (Open Source)_: Owning intelligence. High fixed cost (hosting). Low variable cost.
+
+- **Asset Creation**: A fine-tuned model that perfectly understands your company's legacy code or legal jargon is a defensible moat. A prompt in ChatGPT is not.
+
+### 8. Common Pitfalls & Misconceptions
+
+- **"Fine-Tuning adds knowledge"**: No. It adds _style_. If you fine-tune a model on your company wiki, it will hallucinate facts that look like your wiki. Use RAG for facts. Use FT for format.
+- **Over-training**: Training for too many epochs makes the model "collapse" (it starts repeating the training data verbatim or outputting gibberish). Stop early.
+
+### 9. Prerequisites & Next Steps
+
+- **Prerequisite**: Access to a GPU (Google Colab T4 is sufficient for LoRA) and Python.
+- **Next Step**: Now that we have a model that works, how do we serve it? Day 41 starts our **Deployment & Inference** arc, focusing on **"Throughput vs. Latency: Batching Strategies."**
+
+### 10. Further Reading & Resources
+
+- **Paper**: _LoRA: Low-Rank Adaptation of Large Language Models_ (Hu et al.).
+- **Paper**: _QLoRA: Efficient Finetuning of Quantized LLMs_ (Dettmers et al.).
+- **Library**: _Unsloth_ (Currently the fastest library for fine-tuning Llama/Mistral).

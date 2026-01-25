@@ -1,0 +1,211 @@
+---
+title: "Semantic Caching (The Cost Firewall)"
+failure: "Bill Shock & Latency"
+lens: "Security"
+domain: "MLOps"
+day: "035"
+status: "locked"
+tags: ["Caching", "Redis", "Cost Optimization", "Latency"]
+date: "2026-02-04"
+---
+
+### Abstract
+
+In high-volume RAG systems, query distribution follows a Power Law: 20% of unique queries account for 80% of traffic. Users repeatedly ask variations of _"How do I reset my password?"_ or _"What are the office hours?"_ Treating every one of these as a novel reasoning task is engineering malpractice. It burns GPU cycles, incurs unnecessary API costs, and degrades user experience with avoidable latency. This post introduces **Semantic Caching**—a layer that intercepts queries, compares their vector embeddings to previously answered questions, and serves cached responses for high-similarity matches, reducing latency from 2,000ms to 50ms.
+
+### 1. Why This Topic Matters
+
+The economic viability of an AI product often hinges on its "Token-to-Value" ratio. If you pay $0.03 to answer "How do I add a user?" the first time, that is an investment. If you pay $0.03 the next 10,000 times someone asks it, that is waste.
+
+Beyond cost, **Latency is the enemy of engagement.** A semantic cache is the only way to achieve "instant" (sub-100ms) responses in an LLM architecture. It acts as a firewall, protecting your expensive inference infrastructure from the noise of repetitive user intent.
+
+### 2. Core Concepts & Mental Models
+
+- **Exact vs. Semantic Match**:
+- _Exact Cache (KV Store)_: Matches `hash("reset password")`. Fails on `"reset my password"`.
+- _Semantic Cache_: Matches `distance(embed("reset password"), embed("I forgot my password")) < threshold`.
+
+- **The Similarity Threshold ($\tau$)**: This is your risk dial.
+- $\tau = 0.99$: Conservative. Only extremely close phrasings hit the cache. Low risk of wrong answers.
+- $\tau = 0.85$: Aggressive. "What is the capital?" might match "What is the capitol?". High risk of false positives.
+
+- **Cache Hit Journey**: User Query $\to$ Embedding $\to$ Vector Search (Cache) $\to$ Hit? $\to$ Return JSON.
+- **Cache Miss Journey**: User Query $\to$ Embedding $\to$ Vector Search (Cache) $\to$ Miss $\to$ Retrieval $\to$ LLM $\to$ **Write to Cache** $\to$ Return JSON.
+
+### 3. Theoretical Foundations
+
+We utilize **Cosine Similarity** in high-dimensional space.
+Given a query vector $Q$ and a cached vector $C$, we compute:
+$$Sim(Q, C) = \frac{Q \cdot C}{||Q|| \cdot ||C||}$$
+
+The critical architectural decision is determining the optimal threshold. This is rarely a single number; it often requires calibration per domain. A coding assistant might tolerate lower similarity (code concepts overlap), whereas a medical bot requires near-exact matching ($\tau > 0.98$).
+
+### 4. Production-Grade Implementation
+
+**The Tenant Isolation Problem**
+The most dangerous vulnerability in semantic caching is **Data Leaking**.
+
+- _User A (CEO)_ asks: "What is the acquisition strategy?" $\to$ Answer cached.
+- _User B (Intern)_ asks: "What is the acquisition strategy?" $\to$ Cache Hit.
+- **Result**: The intern sees the confidential answer meant for the CEO.
+
+**Solution**: The cache key must be a composite of `Embedding + TenantID + Role`. We never search the global cache space; we search only within the user's permission boundary.
+
+### 5. Hands-On Project / Exercise
+
+**Objective**: Implement a `SecureSemanticCache` that intercepts queries. It must differentiate between a "Miss" (slow path) and a "Hit" (fast path) for semantically similar but syntactically different questions, while enforcing tenant isolation.
+
+**Constraints**:
+
+- Uses a localized vector store (simulating Redis/Qdrant).
+- Enforces a strict similarity threshold.
+- Demonstrates isolation: Similar questions from different tenants must NOT hit.
+
+#### The Implementation
+
+```python
+import time
+import numpy as np
+from typing import List, Dict, Tuple
+
+# --- Mock Infrastructure ---
+class MockEmbeddingModel:
+    """
+    Simulates embeddings.
+    Returns similar vectors for semantically similar text.
+    """
+    def embed(self, text: str) -> np.array:
+        # Simplified simulation:
+        # We create a deterministic vector based on character sums + hashing
+        # to simulate 'closeness' for the demo.
+        text = text.lower().strip()
+
+        # Base vector for "reset password" related concepts
+        if any(x in text for x in ["reset", "forgot", "password"]):
+            base = np.array([0.9, 0.1, 0.1])
+        # Base vector for "salary" related concepts
+        elif "salary" in text:
+            base = np.array([0.1, 0.9, 0.1])
+        else:
+            base = np.array([0.1, 0.1, 0.9])
+
+        # Add slight noise based on length to make vectors distinct but close
+        noise = len(text) * 0.001
+        return base + noise
+
+class MockLLM:
+    def generate(self, prompt: str) -> str:
+        time.sleep(1.0) # Simulate expensive API call
+        return f"Generated Answer for: {prompt}"
+
+# --- The Semantic Cache System ---
+
+class SecureSemanticCache:
+    def __init__(self, threshold: float = 0.95):
+        self.encoder = MockEmbeddingModel()
+        self.llm = MockLLM()
+        self.threshold = threshold
+        # Storage format: { tenant_id: [(vector, answer, original_query), ...] }
+        self.cache: Dict[str, List[Tuple[np.array, str, str]]] = {}
+
+    def _cosine_similarity(self, v1: np.array, v2: np.array) -> float:
+        norm_v1 = np.linalg.norm(v1)
+        norm_v2 = np.linalg.norm(v2)
+        if norm_v1 == 0 or norm_v2 == 0: return 0.0
+        return np.dot(v1, v2) / (norm_v1 * norm_v2)
+
+    def query(self, user_query: str, tenant_id: str) -> str:
+        start_time = time.time()
+        query_vec = self.encoder.embed(user_query)
+
+        # 1. Check Cache (Scoped to Tenant)
+        if tenant_id in self.cache:
+            best_score = -1
+            best_answer = None
+
+            for cached_vec, cached_ans, _ in self.cache[tenant_id]:
+                score = self._cosine_similarity(query_vec, cached_vec)
+                if score > best_score:
+                    best_score = score
+                    best_answer = cached_ans
+
+            # 2. Return if Hit
+            if best_score >= self.threshold:
+                latency = (time.time() - start_time) * 1000
+                print(f"[{tenant_id}] CACHE HIT ({best_score:.4f}) | Latency: {latency:.2f}ms")
+                return f"[Cached] {best_answer}"
+
+        # 3. Cache Miss - Call LLM
+        print(f"[{tenant_id}] CACHE MISS. Calling LLM...")
+        response = self.llm.generate(user_query)
+
+        # 4. Write to Cache
+        if tenant_id not in self.cache:
+            self.cache[tenant_id] = []
+
+        # Simple FIFO eviction or TTL would go here in production
+        self.cache[tenant_id].append((query_vec, response, user_query))
+
+        latency = (time.time() - start_time) * 1000
+        print(f"[{tenant_id}] Served Fresh | Latency: {latency:.2f}ms")
+        return response
+
+# --- Execution ---
+
+system = SecureSemanticCache(threshold=0.98) # High threshold for safety
+
+# Scenario A: Initial Query (Slow)
+print("\n--- Query 1: Initial Ask ---")
+system.query("How do I reset my password?", tenant_id="Tenant_A")
+
+# Scenario B: Semantically Similar Query (Fast)
+# "forgot" vs "reset" should be close enough in our mock embedding logic
+print("\n--- Query 2: Different Phrasing ---")
+system.query("I forgot my password, how to fix?", tenant_id="Tenant_A")
+
+# Scenario C: Tenant Isolation Check
+# Tenant B asks the SAME question. Should NOT hit Tenant A's cache.
+print("\n--- Query 3: Different Tenant (Security Check) ---")
+system.query("How do I reset my password?", tenant_id="Tenant_B")
+
+
+```
+
+### 6. Ethical, Security & Safety Considerations
+
+- **The "Context Poisoning" Risk**: If a malicious user manages to inject a wrong answer into the cache (e.g., via a prompt injection that the LLM falls for), that wrong answer is now "canonical" for all future users.
+- _Mitigation_: Implement a "Write-Through" policy where cached entries are periodically re-validated or only answers with high confidence scores are cached.
+
+- **Privacy Leaks**: As demonstrated, caching must respect Access Control Lists (ACLs). Caching a summary of a confidential document creates a bypass if the cache retrieval doesn't check document permissions. **Rule: The cache key must include a hash of the user's permissions.**
+
+### 7. Business & Strategic Implications
+
+- **The 80/20 Rule**: For a SaaS platform, semantic caching can reduce LLM bills by 30-50% with zero impact on quality. It is the highest ROI feature you can build in MLOps.
+- **Handling "Freshness"**: If your underlying documents update (e.g., the policy changes), the cache is now lying.
+- _Strategy_: You must implement **Cache Invalidation**. When `Document_X` is updated, find all cached vectors associated with `Document_X` and purge them. This requires tagging cache entries with source DocIDs.
+
+### 8. Common Pitfalls & Misconceptions
+
+- **Global Caching**: "Let's just cache everything globally to save money." This is a security disaster waiting to happen.
+- **Threshold Tuning**: Setting the threshold too low (0.80) results in users getting answers to questions they didn't ask. This is confusing and erodes trust. Better to miss the cache than serve a false positive.
+- **Caching Short Queries**: Short queries (e.g., "Hi") have low semantic density and can match random things. Often, it's better to use exact string matching for very short queries and semantic matching for long ones.
+
+### 9. Prerequisites & Next Steps
+
+### 9. Prerequisites & Next Steps
+
+- **Prerequisite**: A vector database (Redis Stack, Qdrant, or pgvector).
+- **Next Step**: We have secured the cost, but we need visibility into the execution. Day 36 covers **"Observability for Chains"**—using Distributed Tracing to debug black-box AI logic.
+
+### Coming Up Next
+
+[Day 36: Observability for Chains (Tracing)](/days/036) - implementing **OpenTelemetry** and **Distributed Tracing** to move beyond logging and visualize the exact execution path of LLM chains.
+
+### 10. Further Reading & Resources
+
+- **Tool**: _GPTCache_ (Open source semantic cache library).
+- **Architecture**: _Redis Vector Search for Semantic Caching_.
+- **Concept**: _Locality-Sensitive Hashing (LSH)_ for faster approximate matching.
+- **Tool**: _GPTCache_ (Open source semantic cache library).
+- **Architecture**: _Redis Vector Search for Semantic Caching_.
+- **Concept**: _Locality-Sensitive Hashing (LSH)_ for faster approximate matching.

@@ -1,0 +1,188 @@
+---
+title: "Privacy Engineering: PII Masking"
+failure: "Data Leaks to Third Parties"
+lens: "Governance"
+domain: "Security"
+day: "038"
+status: "locked"
+tags: ["PII", "GDPR", "Presidio", "Privacy", "HIPAA"]
+date: "2026-02-07"
+---
+
+### Abstract
+
+When integrating third-party Model-as-a-Service providers (OpenAI, Anthropic, Cohere), your architecture effectively pipes internal data through a public API. For regulated industries (Finance, Healthcare), sending raw Personally Identifiable Information (PII) like emails, SSNs, or credit card numbers to an external vendor is a non-starter—often a violation of GDPR, HIPAA, or SOC2 controls. This post details the architecture of a **Privacy Vault Middleware**: a bidirectional system that detects and tokenizes sensitive entities _before_ they leave your infrastructure, and re-hydrates the response _after_ it returns, ensuring the model never "sees" the real data.
+
+### 1. Why This Topic Matters
+
+"We have a BAA (Business Associate Agreement) with OpenAI" is a legal defense, not a technical control. If an engineer accidentally logs a prompt containing a patient's diagnosis and name to a third-party observability tool, or if the model provider suffers a breach, your data is compromised.
+
+**Privacy Engineering** moves trust from "policy" to "code." By mathematically guaranteeing that the external processor only receives anonymized tokens (e.g., `<PERSON_1>` instead of "John Doe"), you neutralize the risk of data leaks at the source. This enables enterprises to use powerful public models on sensitive data without compromising compliance.
+
+### 2. Core Concepts & Mental Models
+
+- **The Trusted Boundary**: The line between your VPC (Virtual Private Cloud) and the internet. PII must never cross this line in plaintext.
+- **Masking vs. Redaction**:
+- _Redaction_: "User [REDACTED] asked..." (Destructive; model loses context).
+- _Masking (Tokenization)_: "User <PERSON_1> asked..." (Preserves structure; allows reference).
+
+- **Rehydration (Detokenization)**: The reverse process. If the model says "Send the file to <EMAIL_1>," the middleware must swap `<EMAIL_1>` back to `alice@example.com` before the user sees it.
+- **Contextual Fidelity**: The mask must be semantically appropriate. Replacing a name with `<DATE_1>` will confuse the model. Replacing it with `<PERSON_1>` retains the semantic role.
+
+### 3. Theoretical Foundations
+
+We rely on **Named Entity Recognition (NER)** for detection.
+Given a sequence of tokens $T$, the NER model outputs labels $L$ where $L_i \in \{PERSON, EMAIL, ...\}$.
+
+The architecture follows a strictly local "Map-Reduce" pattern:
+
+1. **Map**: $Data \to Tokens + SecretMap$
+2. **Process**: $LLM(Tokens) \to TokenizedResponse$
+3. **Reduce**: $TokenizedResponse + SecretMap \to FinalData$
+
+### 4. Production-Grade implementation
+
+In production, we use **Microsoft Presidio** for identification (using Models + Regex) and deanonymization. However, custom logic is often required for the _rehydration_ step to ensure the mapping persists across the request lifecycle.
+
+**Trade-off: Context Loss**
+If you mask "Apple" (the company) as `<ORG_1>`, the model might lose the nuance of it being a tech company versus a fruit. Advanced strategies use **Synthetic Replacement** (replacing "Alice" with "Jane", "Google" with "Acme Corp") to maintain semantic density, but this increases the complexity of rehydration.
+
+### 5. Hands-On Project / Exercise
+
+**Objective**: Build a `PrivacyVault` middleware. It must intercept a prompt containing an email, replace it with a token, send it to a mock LLM, and correctly restore the email in the response.
+
+**Constraints**:
+
+- The LLM must _never_ receive the actual email address.
+- The system must handle the mapping statefully for the duration of the request.
+
+#### The Implementation
+
+```python
+import re
+import uuid
+from typing import Dict, Tuple
+
+class PrivacyVault:
+    def __init__(self):
+        # In production, use Microsoft Presidio or a local BERT NER model.
+        # For this demo, we use strict Regex for auditability.
+        self.email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+
+    def _generate_token(self, entity_type: str) -> str:
+        """Generates a unique, trackable token."""
+        return f"<{entity_type}_{uuid.uuid4().hex[:6]}>"
+
+    def mask(self, text: str) -> Tuple[str, Dict[str, str]]:
+        """
+        Scans text for PII, replaces with tokens, returns masked text + secret map.
+        """
+        mapping = {}
+
+        def replace_match(match):
+            original_val = match.group(0)
+            # Check if we already have a token for this exact value (consistency)
+            for token, val in mapping.items():
+                if val == original_val:
+                    return token
+
+            # Create new token
+            token = self._generate_token("EMAIL")
+            mapping[token] = original_val
+            return token
+
+        masked_text = re.sub(self.email_pattern, replace_match, text)
+        return masked_text, mapping
+
+    def rehydrate(self, text: str, mapping: Dict[str, str]) -> str:
+        """
+        Restores PII from tokens using the secret map.
+        """
+        for token, original_val in mapping.items():
+            if token in text:
+                text = text.replace(token, original_val)
+        return text
+
+# --- Mocking the LLM Interaction ---
+
+class SecureLLMClient:
+    def __init__(self, vault: PrivacyVault):
+        self.vault = vault
+
+    def chat(self, user_prompt: str) -> str:
+        print(f"\n--- [Step 1] Incoming Request: '{user_prompt}' ---")
+
+        # 1. MASKING (Local Processing)
+        masked_prompt, secret_map = self.vault.mask(user_prompt)
+        print(f"🔒 [Vault] Masked to send to LLM: '{masked_prompt}'")
+        print(f"🔑 [Vault] Secret Map Held Locally: {secret_map}")
+
+        # 2. LLM CALL (External API)
+        # Simulating an LLM that uses the token in its response
+        # The LLM sees "<EMAIL_a1b2c3>", not "ceo@example.com"
+        llm_response_raw = self._simulate_external_llm(masked_prompt)
+        print(f"☁️  [LLM] Raw Response: '{llm_response_raw}'")
+
+        # 3. REHYDRATION (Local Processing)
+        final_response = self.vault.rehydrate(llm_response_raw, secret_map)
+        return final_response
+
+    def _simulate_external_llm(self, prompt: str) -> str:
+        """
+        Simulates the 3rd party model logic.
+        Notice it just parrots the token it received.
+        """
+        if "<EMAIL_" in prompt:
+            # Extract the token to mimic intelligent reference
+            token = re.search(r'<EMAIL_[a-f0-9]+>', prompt).group(0)
+            return f"I have generated a draft email to {token}. Should I send it?"
+        return "I don't see any contact info."
+
+# --- Execution ---
+
+vault = PrivacyVault()
+client = SecureLLMClient(vault)
+
+# Scenario: User mentions a sensitive email
+user_input = "Draft a message to albert.einstein@physics.princeton.edu about the project."
+final_output = client.chat(user_input)
+
+print(f"\n--- [Step 4] Final User View ---\n{final_output}")
+
+# Verification
+assert "albert.einstein" not in client._simulate_external_llm.__code__.co_consts # (Conceptual check)
+assert "albert.einstein" in final_output
+
+```
+
+### 6. Ethical, Security & Safety Considerations
+
+- **The Re-identification Risk**: If you use consistent hashing (hashing "John" to "Token_123" every time), an attacker who guesses "John" can confirm it by looking at the hash. **Guidance**: Use random, session-scoped tokens (UUIDs) as shown above, so the same name has different tokens in different sessions.
+- **Leakage via Context**: Even if you mask the name "Steve Jobs," if the prompt says "The founder of Apple who died in 2011," the LLM can infer the identity. Masking Direct Identifiers (names) is easy; masking Quasi-Identifiers (biography) is hard.
+- **Safety Filters**: Be aware that replacing bad words with tokens might bypass safety filters on the LLM side, or conversely, the tokens might trigger confusion in the model's safety alignment.
+
+### 7. Business & Strategic Implications
+
+- **Unblocking Healthcare/Finance**: This architecture is the "Golden Key" for sales in regulated sectors. Being able to say, "Your customer data never leaves your VPC in plaintext," removes the biggest objection to GenAI adoption.
+- **Audit Trail**: The mapping logs (who requested what PII unmasked and when) become a critical part of your compliance audit trail.
+
+### 8. Common Pitfalls & Misconceptions
+
+- **"Regex is enough"**: Regex fails on names ("Will Smith" vs. "will smith the metal"). You need NLP-based NER (like Presidio or spaCy) for robust name/location detection.
+- **Breaking the Token**: If the token format is complex (`<EMAIL:ID:123>`), the LLM might hallucinate or split it. Keep tokens simple and distinct (`<EMAIL_1>`).
+- **Forgetting to Rehydrate**: Sometimes the LLM rephrases the output such that the token is lost or modified. The rehydration logic needs fuzzy matching or strict instructions to the LLM to preserve tokens exactly.
+
+### 9. Prerequisites & Next Steps
+
+- **Prerequisite**: Basic Regex and understanding of API middleware patterns.
+- **Next Step**: Sensitive data is now safe, but what about the database itself as we scale? Day 39 covers **"Vector Database Operations"**—handling millions of users with correct filtration and indexing.
+
+### Coming Up Next
+
+[Day 39: Vector Database Operations (Scale)](/days/039) - Managing **HNSW Indices**, **Metadata Scaling**, and **Multi-Tenant Isolation** in high-scale vector environments.
+
+### 10. Further Reading & Resources
+
+- **Tool**: _Microsoft Presidio_ (Industrial-grade PII detection/anonymization).
+- **Library**: _Faker_ (For generating synthetic data replacements).
+- **Regulation**: _HIPAA Safe Harbor Method_ (List of 18 identifiers that must be removed).

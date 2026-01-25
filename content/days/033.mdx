@@ -1,0 +1,218 @@
+---
+title: "Automated Evaluation (The RAG Triad)"
+failure: "Vibes-based Deployment"
+lens: "Governance"
+domain: "MLOps"
+day: "033"
+status: "locked"
+tags: ["RAGAs", "CI/CD", "Evaluation", "Quality Assurance"]
+date: "2026-02-02"
+---
+
+### Abstract
+
+The most pervasive anti-pattern in Generative AI engineering is "Vibes-Based Deployment"—the practice of pushing updates because a handful of spot-checks "felt smarter." In deterministic software, we rely on unit tests. In probabilistic RAG systems, we must rely on **Automated LLM-as-a-Judge Evaluation**. This post details the implementation of the "RAG Triad"—Context Precision, Context Recall, and Faithfulness—as a blocking gate in your CI/CD pipeline. We establish a governance protocol where regression in factual grounding triggers an automatic build failure, regardless of how "helpful" the answers seem.
+
+### 1. Why This Matters
+
+In traditional software, if you refactor a database query, you run a test suite to ensure the data returned is identical. In RAG, changing a chunking strategy, embedding model, or prompt template creates non-deterministic ripples. A tweak that improves answers for "Summarize Q3 Financials" might silently break retrieval for "What is the harassment policy?"
+
+Without automated evaluation, you are flying blind. You cannot optimize what you cannot measure. More critically, without a hard metric for **Faithfulness** (grounding), you risk optimizing for **Answer Relevance** (helpfulness) at the expense of truth—training your model to be a convincing liar.
+
+### 2. Core Concepts & Mental Models
+
+We evaluate RAG systems using the **RAG Triad**, which isolates failure modes into three distinct vectors:
+
+1. **Context Precision & Recall (Retrieval Performance)**
+
+- _Recall_: Is the ground truth document present in the retrieved chunks?
+- _Precision_: What is the signal-to-noise ratio? Are we distracting the LLM with irrelevant chunks?
+
+2. **Faithfulness (Groundedness)**
+
+- Does the generated answer rely _exclusively_ on the retrieved context? This detects hallucinations.
+
+3. **Answer Relevance (Utility)**
+
+- Does the generated answer actually address the user's query?
+
+**The Hierarchy of Metrics**:
+In a Responsible AI framework, these metrics are not equal. **Faithfulness is a veto constraint.** A highly relevant answer that is unfaithful is a hallucination. A faithful answer that is irrelevant is merely unhelpful. We optimize for Relevance only _after_ Faithfulness thresholds are met.
+
+### 3. Theoretical Foundations
+
+We utilize the **LLM-as-a-Judge** paradigm. Since linguistic correctness is hard to measure with regex, we employ a stronger model (e.g., GPT-4 or a specialized fine-tuned evaluator) to grade the outputs of the production model.
+
+For **Faithfulness**, the evaluation logic follows NLI (Natural Language Inference):
+Given Context $C$ and Answer $A$, we extract statements $S$ from $A$.
+$$Faithfulness = \frac{|S_{entailed}|}{|S_{total}|}$$
+Where $S_{entailed}$ are statements logically entailed by $C$.
+
+### 4. Production-Grade Implementation
+
+An ad-hoc evaluation script is insufficient. Evaluation must be part of the **Continuous Integration (CI)** pipeline.
+
+**The Golden Dataset vs. Synthetics**:
+
+- **Golden Dataset**: Human-curated pairs of (Question, Ground Truth Answer, Source Document). indispensable but expensive to maintain.
+- **Synthetic Test Sets**: We use an LLM to scan our knowledge base and generate (Question, Answer, Context) triples. This allows us to scale evaluation coverage to thousands of documents with zero human labeling effort.
+
+**The Pipeline**:
+
+1. **Generate**: Create synthetic test cases from the current knowledge base.
+2. **Inference**: Run a sample (e.g., 50 questions) through the candidate RAG pipeline.
+3. **Evaluate**: Use RAGAs (Retrieval Augmented Generation Assessment) to score the traces.
+4. **Gate**: Fail the build if metrics drop below service-level objectives (SLOs).
+
+### 5. Hands-On Project / Exercise
+
+**Objective**: Build a CI-ready evaluation script using `ragas` that acts as a quality gate. It must enforce a strict lower bound on Faithfulness.
+
+**Constraints**:
+
+- The script simulates a "Pull Request" check.
+- It prioritizes Faithfulness over Relevancy.
+
+#### The Implementation
+
+```python
+import pandas as pd
+from ragas import evaluate
+from ragas.metrics import (
+    context_precision,
+    context_recall,
+    faithfulness,
+    answer_relevancy,
+)
+from datasets import Dataset
+
+# --- Configuration ---
+# In production, these are loaded from environment variables/config files
+THRESHOLDS = {
+    "faithfulness": 0.90,       # Strict safety bar
+    "answer_relevancy": 0.70,   # Utility bar
+    "context_recall": 0.80      # Retrieval bar
+}
+
+class QualityGateFailure(Exception):
+    """Raised when RAG metrics fail to meet defined SLOs."""
+    pass
+
+def run_evaluation_pipeline(test_dataset: dict):
+    """
+    Simulates the evaluation step in a CI pipeline.
+
+    Args:
+        test_dataset: Dict containing 'question', 'answer', 'contexts', 'ground_truth'
+                      (In reality, 'answer' comes from the model being tested)
+    """
+
+    # 1. Convert to HuggingFace Dataset format required by Ragas
+    hf_dataset = Dataset.from_dict(test_dataset)
+
+    # 2. Run Ragas Evaluation
+    # This uses an LLM (Judge) to score the interactions
+    print("Running automated evaluation (LLM-as-a-Judge)...")
+    results = evaluate(
+        hf_dataset,
+        metrics=[
+            context_precision,
+            context_recall,
+            faithfulness,
+            answer_relevancy,
+        ],
+    )
+
+    scores = results
+    print(f"\n--- Evaluation Results ---\n{scores}")
+
+    # 3. The Governance Logic (The "Gate")
+    # We fail the build if Faithfulness is low, regardless of Relevancy.
+
+    failures = []
+
+    # Check Faithfulness (The Hard Constraint)
+    if scores['faithfulness'] < THRESHOLDS['faithfulness']:
+        failures.append(
+            f"CRITICAL: Faithfulness {scores['faithfulness']:.2f} "
+            f"is below threshold {THRESHOLDS['faithfulness']}. "
+            "Model is hallucinating content not in retrieval."
+        )
+
+    # Check Relevancy (The Soft Constraint)
+    if scores['answer_relevancy'] < THRESHOLDS['answer_relevancy']:
+        failures.append(
+            f"WARNING: Relevancy {scores['answer_relevancy']:.2f} "
+            f"is below threshold {THRESHOLDS['answer_relevancy']}."
+        )
+
+    # Check Retrieval Metrics
+    if scores['context_recall'] < THRESHOLDS['context_recall']:
+        failures.append(
+             f"RETRIEVAL: Context Recall {scores['context_recall']:.2f} "
+             "indicates relevant documents are being missed."
+        )
+
+    # 4. Decision
+    if failures:
+        print("\n❌ BUILD FAILED")
+        for f in failures:
+            print(f"  - {f}")
+
+        # In a real CI script, we would exit with code 1
+        raise QualityGateFailure("RAG Quality Gate Check Failed")
+
+    print("\n✅ BUILD PASSED: All metrics within safety parameters.")
+
+# --- Execution Simulation ---
+
+# Mock Data: A scenario where the model is helpful but hallucinates (Low Faithfulness)
+# The context discusses "Alpha API", but the answer invents features about "Beta API".
+mock_data = {
+    "question": ["How do I authenticate with the API?"],
+    "contexts": [["The Alpha API uses a Bearer token in the header."]],
+    "answer": ["You can use Bearer tokens or OAuth2 with the Beta Extension."], # Hallucination
+    "ground_truth": ["Use a Bearer token in the header."]
+}
+
+try:
+    # This SHOULD fail because the answer mentions OAuth2/Beta which is not in context
+    run_evaluation_pipeline(mock_data)
+except QualityGateFailure:
+    print("(Expected behavior: Pipeline blocked due to hallucination.)")
+
+
+```
+
+### 6. Ethical, Security & Safety Considerations
+
+- **Adversarial Contamination**: If your evaluation dataset is static, developers will inadvertently "overfit" to the test set. You must continuously rotate and generate new synthetic questions to prevent metric hacking.
+- **The Cost-Security Trade-off**: Running evaluations costs money (API calls to the Judge LLM). Some teams skip evals to save budget. This is a false economy. The cost of a reputational incident far exceeds the cost of tokens.
+- **Bias in the Judge**: Be aware that "LLM-as-a-Judge" models (usually GPT-4) have their own biases. They tend to favor longer, more verbose answers (length bias) even if they are less concise.
+
+### 7. Business & Strategic Implications
+
+- **The Quality Scorecard**: This pipeline allows you to present a "Quality Scorecard" to stakeholders. Instead of saying "The bot is ready," you say "We have achieved 92% Faithfulness and 88% Recall on the 'Q4-Compliance' dataset."
+- **Defensibility**: If an error occurs in production, having a history of passing CI logs demonstrates **due diligence**. You can prove that the system met rigorous standards at the time of deployment, which is crucial for liability defense.
+
+### 8. Common Pitfalls & Misconceptions
+
+- **Metric Averaging**: Never average Faithfulness across the whole dataset to hide failures. If 90 queries are 100% faithful and 10 queries are 0% faithful (total hallucinations), the average is 90%. But you have 10 dangerous answers. You need to track the **percentage of queries below threshold**, not just the mean.
+- **Ignoring Retrieval**: Teams often focus on the LLM prompt. But if `Context Recall` is low, the best prompt in the world cannot answer the question. You must debug the retriever (Day 30), not just the generator.
+
+### 9. Prerequisites & Next Steps
+
+### 9. Prerequisites & Next Steps
+
+- **Prerequisite**: A functioning RAG pipeline and a dataset of documents.
+- **Next Step**: Evalutation tells you _what_ failed. To fix _retrieval_ failures for complex questions, we need smarter queries. Day 34 will cover **Advanced Query Transformations**—techniques like Decomposition and HyDE to solve the "Zero-Result Problem".
+
+### Coming Up Next
+
+[Day 34: Advanced Query Transformations](/days/034) - Implementing **Query Decomposition** and **HyDE** strategies to handle complex, multi-hop user intent.
+
+### 10. Further Reading & Resources
+
+- **Framework**: _Ragas: Automated Evaluation of Retrieval Augmented Generation_ (Es et al., 2023).
+- **Paper**: _G-Eval: NLG Evaluation using GPT-4 with Better Human Alignment_ (Liu et al.).
+- **Tool**: _Arize Phoenix_ for visualizing RAG traces and evaluations.
