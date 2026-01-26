@@ -2,12 +2,12 @@
   display: inline-block;
   padding: 4px 12px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.5); /* Glassy text background */
+  background: var(--bg-secondary);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   border: 1px solid var(--border-subtle);
   font-size: 0.75rem;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font-family: var(--font-recia);
   cursor: default;
   transition: all 0.2s ease;
@@ -15,7 +15,7 @@
 }
 
 .tag:hover {
-  border-color: var(--text-secondary);
-  background: rgba(255, 255, 255, 0.8);
+  border-color: var(--accent-color);
+  background: var(--accent-light);
   color: var(--text-primary);
 }

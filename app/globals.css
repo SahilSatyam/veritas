@@ -1,21 +1,31 @@
 :root {
   /* Colors - Light Theme (Default) */
-  --bg-primary: #FCFCFA; /* Very warm, paper-like off-white */
-  --bg-secondary: #F5F5F0;
-  --text-primary: #1A1A1A;
+  --bg-primary: #fcfcfa; /* Very warm, paper-like off-white */
+  --bg-secondary: #f5f5f0;
+  --bg-card: #ffffff; /* Card/input backgrounds */
+  --text-primary: #1a1a1a;
   --text-secondary: #555555;
-  --border-subtle: #E5E5E0;
-  --accent-color: #2A4B55; /* Muted teal/slate */
-  --accent-light: #E8F0F2;
-  
+  --text-inverse: #ffffff; /* For text on dark backgrounds */
+  --border-subtle: #e5e5e0;
+  --accent-color: #2a4b55; /* Muted teal/slate */
+  --accent-light: #e8f0f2;
+
+  /* Glassmorphism - Light Theme */
+  --glass-bg: rgba(255, 255, 255, 0.25);
+  --glass-border: rgba(255, 255, 255, 0.4);
+  --glass-shadow-inset: rgba(255, 255, 255, 0.5);
+  --glass-shadow-hover-inset: rgba(255, 255, 255, 0.8);
+
   /* Typography */
-  --font-sans: 'Recia', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-serif: "Charter", "Bitstream Charter", "Sitka Text", Cambria, serif; 
+  --font-sans:
+    "Recia", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  --font-serif: "Charter", "Bitstream Charter", "Sitka Text", Cambria, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --font-inter-base: var(--font-inter), var(--font-sans);
-  --font-tanker: 'Tanker', sans-serif;
-  --font-recia: 'Recia', serif;
-  
+  --font-tanker: "Tanker", sans-serif;
+  --font-recia: "Recia", serif;
+
   /* Spacing */
   --spacing-unit: 4px;
   --container-width: 1100px;
@@ -29,12 +39,20 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --bg-primary: #111111;
-    --bg-secondary: #1A1A1A;
-    --text-primary: #EAEAEA;
-    --text-secondary: #A0A0A0;
+    --bg-secondary: #1a1a1a;
+    --bg-card: #222222; /* Card/input backgrounds - dark */
+    --text-primary: #eaeaea;
+    --text-secondary: #a0a0a0;
+    --text-inverse: #111111; /* For text on light backgrounds in dark mode */
     --border-subtle: #333333;
-    --accent-color: #8AB4BF;
-    --accent-light: #1E292E;
+    --accent-color: #8ab4bf;
+    --accent-light: #1e292e;
+
+    /* Glassmorphism - Dark Theme */
+    --glass-bg: rgba(30, 30, 30, 0.6);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-shadow-inset: rgba(255, 255, 255, 0.05);
+    --glass-shadow-hover-inset: rgba(255, 255, 255, 0.1);
   }
 }
 
@@ -53,12 +71,20 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-button, input, select, textarea {
+button,
+input,
+select,
+textarea {
   font-family: inherit;
 }
 
 /* Typography Utilities */
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-tanker);
   font-weight: 400;
   line-height: 1.1;
@@ -66,9 +92,20 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
 }
 
-h1 { font-size: 3.5rem; margin-bottom: 1.5rem; }
-h2 { font-size: 2.25rem; margin-bottom: 1rem; margin-top: 2rem; }
-h3 { font-size: 1.5rem; margin-bottom: 0.75rem; margin-top: 1.5rem; }
+h1 {
+  font-size: 3.5rem;
+  margin-bottom: 1.5rem;
+}
+h2 {
+  font-size: 2.25rem;
+  margin-bottom: 1rem;
+  margin-top: 2rem;
+}
+h3 {
+  font-size: 1.5rem;
+  margin-bottom: 0.75rem;
+  margin-top: 1.5rem;
+}
 
 p {
   margin-bottom: 1.5rem;
@@ -95,24 +132,51 @@ a:hover {
 
 /* Micro-interactions */
 .interactive-card {
-  transition: transform var(--transition-smooth), box-shadow var(--transition-smooth);
+  transition:
+    transform var(--transition-smooth),
+    box-shadow var(--transition-smooth);
 }
 .interactive-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
 /* Utility Classes matching the 'Design System' idea */
-.text-secondary { color: var(--text-secondary); }
-.text-micro { font-size: 0.875rem; color: var(--text-secondary); }
-.font-mono { font-family: var(--font-mono); }
-.uppercase-tracking { text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem; font-weight: 600; }
+.text-secondary {
+  color: var(--text-secondary);
+}
+.text-micro {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+.font-mono {
+  font-family: var(--font-mono);
+}
+.uppercase-tracking {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
 
 /* Grid systems */
-.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; }
-.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2rem; }
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+}
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+}
 
 @media (max-width: 768px) {
-  .grid-3, .grid-2 { grid-template-columns: 1fr; }
-  h1 { font-size: 2.5rem; }
+  .grid-3,
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+  h1 {
+    font-size: 2.5rem;
+  }
 }

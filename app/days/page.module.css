@@ -20,7 +20,7 @@
 .progressSection {
   margin: 2rem 0;
   padding: 1.5rem;
-  background: white;
+  background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
 }
@@ -70,7 +70,7 @@
   border-radius: 4px;
   border-radius: 4px;
   font-size: 0.9rem;
-  background: white;
+  background: var(--bg-card);
 }
 
 .sortSelect {
@@ -78,7 +78,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: 4px;
   border-radius: 4px;
-  background: white;
+  background: var(--bg-card);
   color: var(--text-secondary);
   cursor: pointer;
 }
@@ -102,7 +102,7 @@
   border: 1px solid var(--border-subtle);
   font-size: 0.85rem;
   cursor: pointer;
-  background: white;
+  background: var(--bg-card);
   color: var(--text-primary);
   transition: all 0.2s;
 }
@@ -113,7 +113,7 @@
 
 .filterChipActive {
   background: var(--text-primary);
-  color: white;
+  color: var(--text-inverse);
   border-color: var(--text-primary);
 }
 

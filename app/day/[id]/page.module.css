@@ -72,7 +72,7 @@
 }
 
 .auditNote {
-  background: #f0f4f8; /* Light blue-grey */
+  background: var(--accent-light); /* Theme-aware blue-grey */
   border-left: 4px solid var(--accent-color);
   padding: 1.5rem;
   margin-bottom: 3rem;
@@ -115,7 +115,7 @@
 }
 
 .codeBlock {
-  background: #f5f5f0;
+  background: var(--bg-secondary);
   padding: 1.5rem;
   border-radius: 4px;
   font-family: var(--font-mono);

@@ -42,7 +42,7 @@
 }
 
 .copyButton:hover {
-  background-color: white;
+  background-color: var(--bg-card);
   color: var(--text-primary);
   border-color: var(--accent-color);
   opacity: 1;
