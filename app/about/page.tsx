@@ -12,7 +12,7 @@ export default function AboutPage() {
         
         <div className={styles.prose}>
           <p>
-            I have a folder on my laptop full of half-finished projects.
+            I have a folder on my laptop full of half-finished or undeployed projects.
           </p>
           <p>
             There’s a chatbot that works 80% of the time. There’s a fraud detection script that runs perfectly in a Jupyter Notebook but has never seen a production server. There are countless &quot;Hello World&quot; implementations of the latest LLM frameworks.
