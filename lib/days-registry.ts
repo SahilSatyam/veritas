@@ -436,8 +436,8 @@ export function getAuditLogEntries(): AuditLogEntry[] {
       displayDate: formatDateDisplay(releaseDate),
       eventType: dayNumber === 1 ? "INIT" : "CONTENT",
       description: dayNumber === 1 
-        ? `Initial Commit & Day ${day.id}`
-        : `Release Day ${day.id}`,
+        ? `Initial Commit & Day ${day.id}: ${day.title}`
+        : `Release Day ${day.id}: ${day.title}`,
       hash: generateDayHash(day.id),
       dayId: day.id,
       dayTitle: day.title,

@@ -4,7 +4,7 @@ failure: "Data Leaks to Third Parties"
 lens: "Governance"
 domain: "Security"
 day: "038"
-status: "locked"
+status: "unlocked"
 tags: ["PII", "GDPR", "Presidio", "Privacy", "HIPAA"]
 date: "2026-02-07"
 ---
@@ -24,9 +24,9 @@ When integrating third-party Model-as-a-Service providers (OpenAI, Anthropic, Co
 - **The Trusted Boundary**: The line between your VPC (Virtual Private Cloud) and the internet. PII must never cross this line in plaintext.
 - **Masking vs. Redaction**:
 - _Redaction_: "User [REDACTED] asked..." (Destructive; model loses context).
-- _Masking (Tokenization)_: "User <PERSON_1> asked..." (Preserves structure; allows reference).
+- _Masking (Tokenization)_: "User `<PERSON_1>` asked..." (Preserves structure; allows reference).
 
-- **Rehydration (Detokenization)**: The reverse process. If the model says "Send the file to <EMAIL_1>," the middleware must swap `<EMAIL_1>` back to `alice@example.com` before the user sees it.
+- **Rehydration (Detokenization)**: The reverse process. If the model says "Send the file to `<EMAIL_1>`," the middleware must swap `<EMAIL_1>` back to `alice@example.com` before the user sees it.
 - **Contextual Fidelity**: The mask must be semantically appropriate. Replacing a name with `<DATE_1>` will confuse the model. Replacing it with `<PERSON_1>` retains the semantic role.
 
 ### 3. Theoretical Foundations
@@ -114,14 +114,14 @@ class SecureLLMClient:
 
         # 1. MASKING (Local Processing)
         masked_prompt, secret_map = self.vault.mask(user_prompt)
-        print(f"🔒 [Vault] Masked to send to LLM: '{masked_prompt}'")
-        print(f"🔑 [Vault] Secret Map Held Locally: {secret_map}")
+        print(f" [Vault] Masked to send to LLM: '{masked_prompt}'")
+        print(f" [Vault] Secret Map Held Locally: {secret_map}")
 
         # 2. LLM CALL (External API)
         # Simulating an LLM that uses the token in its response
         # The LLM sees "<EMAIL_a1b2c3>", not "ceo@example.com"
         llm_response_raw = self._simulate_external_llm(masked_prompt)
-        print(f"☁️  [LLM] Raw Response: '{llm_response_raw}'")
+        print(f"  [LLM] Raw Response: '{llm_response_raw}'")
 
         # 3. REHYDRATION (Local Processing)
         final_response = self.vault.rehydrate(llm_response_raw, secret_map)
