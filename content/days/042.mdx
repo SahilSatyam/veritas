@@ -1,0 +1,245 @@
+---
+title: "Shadow Deployment: The Art of Silent Validation"
+failure: "Big Bang Failures"
+lens: "Governance"
+domain: "MLOps"
+day: "042"
+status: "locked"
+tags: ["Deployment", "Observability", "Risk Management"]
+date: "2026-02-18"
+---
+
+### Abstract
+
+In traditional software, if a new feature fails, you roll back. In AI Engineering, if a new model fails, the damage—reputational, financial, or safety-related—is often irreversible by the time you notice. "Big Bang" deployments, where 100% of traffic is switched to a new model instantly, are a form of operational gambling. To mitigate this, we employ **Shadow Deployment**: a technique where the new model receives live production traffic and generates predictions, but its output is silently logged rather than returned to the user. This creates a risk-free environment to validate performance on real-world distributions, provided one critical governance constraint is met: **Side-Effect Isolation**.
+
+### 1. Why This Topic Matters
+
+Synthetic test sets (Day 41) are necessary but insufficient. They represent the world as you _imagine_ it, not as it _is_. Production traffic contains noise, malice, and edge cases that no "Golden Dataset" can fully capture.
+
+**The Failure Mode: Big Bang Failures**
+Imagine you upgrade from `gpt-3.5-turbo` to a fine-tuned Llama 3 model to save costs. The Llama model passed all your unit tests. You flip the switch. Immediately, users start complaining that the chatbot is refusing to answer benign questions because the fine-tuning data was too safety-heavy. You have to roll back, but you've already eroded user trust.
+
+Shadow deployment allows you to run that Llama 3 model alongside GPT-3.5 for a week. You would have seen the refusal spike in the logs _before_ a single user was affected.
+
+### 2. Core Concepts & Mental Models
+
+**The Shadow Pattern**
+The system routes the incoming user request to the **Live Model** (Model A) and the **Shadow Model** (Model B) simultaneously.
+
+- **Live Path:** Model A processes the request. Its response is returned to the user.
+- **Shadow Path:** Model B processes the request. Its response is discarded (or stored) but **never** shown to the user.
+- **Comparison:** An asynchronous process compares the outputs of A and B for latency, quality, and safety.
+
+**Governance: The "Zombie Action" Problem**
+The most dangerous aspect of shadowing Agentic systems is **Side Effects**.
+If your live model decides to "Send Email to User" and your shadow model also decides to "Send Email to User," the user receives two emails.
+
+- _Rule:_ Shadow models must have "Read-Only" access to the world. All "Write" tools (API calls, DB inserts, Emails) must be mocked or disabled in the shadow context.
+
+### 3. Production-Grade Implementation
+
+Implementing shadow mode requires an asynchronous architecture to avoid latency penalties. If you wait for _both_ models to finish before responding to the user, you have degraded the user experience.
+
+**Key Components:**
+
+1. **Traffic Forking:** Usually handled at the gateway or application layer.
+2. **Correlation IDs:** A unique ID must tag the request so you can join the Live Log and Shadow Log later.
+3. **The Sandbox (Dry Run Mode):** A wrapper around tool execution that intercepts "write" actions in the shadow path.
+
+### 4. Hands-On Project / Exercise
+
+**Scenario:** We are testing a **Quantized Model (Shadow)** to see if it can replace our expensive **Full-Precision Model (Live)** without hurting accuracy.
+**Constraint:** The system has a tool called `refund_user`. The shadow model must _attempt_ to call it but _must not actually execute it_.
+
+**Step 1: The Mock Setup**
+
+```python
+import asyncio
+import time
+import random
+import uuid
+from dataclasses import dataclass
+
+@dataclass
+class ModelResponse:
+    content: str
+    tool_call: str | None
+    latency_ms: float
+
+# The "Dangerous" Tool
+def execute_refund(user_id):
+    print(f"💰 [SIDE EFFECT] REFUND PROCESSED FOR {user_id}")
+    return "Refund success"
+
+# The "Live" Model (Expensive, Slow, Accurate)
+async def live_model(query):
+    start = time.time()
+    await asyncio.sleep(0.5) # Simulate latency
+    # Simulate logic
+    if "refund" in query:
+        return ModelResponse("I've processed that.", "execute_refund", (time.time() - start)*1000)
+    return ModelResponse("Hello there.", None, (time.time() - start)*1000)
+
+# The "Shadow" Model (Cheap, Fast, Maybe reckless?)
+async def shadow_model(query):
+    start = time.time()
+    await asyncio.sleep(0.1) # Faster!
+    # Simulation: Shadow model is eager to refund
+    if "money" in query or "refund" in query:
+        return ModelResponse("Refund sent!", "execute_refund", (time.time() - start)*1000)
+    return ModelResponse("Hi.", None, (time.time() - start)*1000)
+```
+
+**Step 2: The Governed Shadow Runner**
+
+This function wraps the shadow execution to trap side effects.
+
+```python
+async def run_shadow_safe(query, correlation_id):
+    print(f"👻 [Shadow] Processing {correlation_id}...")
+    response = await shadow_model(query)
+
+    # GOVERNANCE CHECK: Intercept Tool Calls
+    if response.tool_call:
+        print(f"🛡️ [Shadow Governance] BLOCKED execution of '{response.tool_call}' for {correlation_id}")
+        # Log the intent, but do not execute
+        log_shadow_result(correlation_id, response, blocked_action=response.tool_call)
+    else:
+        log_shadow_result(correlation_id, response)
+
+def log_shadow_result(corr_id, response, blocked_action=None):
+    # In production, this goes to Datadog/Splunk/BigQuery
+    status = f"BLOCKED {blocked_action}" if blocked_action else "CLEAN"
+    print(f"📝 [Log] ID:{corr_id} | Latency:{response.latency_ms:.1f}ms | {status}")
+```
+
+**Step 3: The Router (Main Application)**
+
+```python
+async def handle_user_request(query):
+    correlation_id = str(uuid.uuid4())[:8]
+
+    # 1. Fire and Forget the Shadow Model
+    # We use asyncio.create_task so we don't wait for it
+    asyncio.create_task(run_shadow_safe(query, correlation_id))
+
+    # 2. Execute Live Model (User waits for this)
+    print(f"🟢 [Live] Processing {correlation_id}...")
+    response = await live_model(query)
+
+    # Execute Live Side Effects (Real)
+    if response.tool_call:
+        execute_refund("User_123")
+
+    return response.content
+
+# Simulation Run
+async def main():
+    print("--- Request 1: Benign ---")
+    print(await handle_user_request("Hello bot"))
+
+    print("\n--- Request 2: Refund ---")
+    print(await handle_user_request("I want my money back"))
+
+    # Allow background tasks to finish for demo purposes
+    await asyncio.sleep(1)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+**Step 4: Analyze the Output**
+Run the code. You will see:
+
+1. The user gets the Live response immediately.
+2. The Live refund is processed (Money icon).
+3. The Shadow model runs in the background.
+4. The Shadow model _tries_ to refund, but the Governance layer blocks it (Shield icon).
+5. You now have logs comparing the latency (100ms vs 500ms) and the intent.
+
+### 5. Required Trade-offs to Surface
+
+**Double Compute Cost vs. Risk Mitigation**
+Shadow mode literally doubles your inference bill for that endpoint.
+
+- _The Trade-off:_ Is the cost of running the shadow model higher than the cost of a production outage?
+- _Resolution:_ Use Shadow Mode for a fixed time window (e.g., 24 hours or 10,000 requests) to reach statistical significance, then turn it off. Do not run shadow mode permanently unless the shadow model is a tiny, cheap supervisor.
+
+**Complexity vs. Velocity**
+Setting up async shadowing and log joining is complex. It slows down the _deployment pipeline setup_, but it speeds up the _model iteration cycle_ because you can test wild ideas in production without fear.
+
+### 6. Ethical, Security & Safety Considerations
+
+**Data Privacy in Logs**
+Shadow models might hallucinate PII or toxic content. When logging shadow outputs, ensure they are treated with the same data governance policies as live data. If the shadow model spits out a racial slur, you don't want that unprepared in your analytics dashboard visible to the whole company. Tag shadow logs as "Experimental/Unverified."
+
+**The "Canary" Alternative**
+If Shadow Mode is too expensive, use a **Canary Deployment**. Route 1% of traffic to the new model.
+
+- _Risk:_ 1% of users _will_ see bad results if the model fails.
+- _Benefit:_ No double billing.
+- _Guidance:_ Use Shadow for major architectural changes. Use Canary for minor prompt tweaks.
+
+### 7. Business & Strategic Implications
+
+- **Metric Validation:** Shadow mode is the only way to prove "Model B is 40% cheaper" with definitive ROI data before committing to the switch.
+- **Operational Maturity:** Implementing shadow deployments signals to regulators and auditors that you have control over your stochastic systems. It moves you from "Testing in Prod" (reckless) to "Observing in Prod" (professional).
+
+### 8. Common Pitfalls & Misconceptions
+
+- **"Shadowing is just for latency":** Incorrect. It is primarily for correctness and safety. Latency is just the easiest metric to read.
+- **Forgetting the Context:** If the Live model engages in a multi-turn conversation, and you shadow only the second turn, the Shadow model might lack the context of the first turn. Shadowing works best on stateless request/response or when the full conversation history is passed to both.
+
+**Advanced: Agentic Trace Comparison with LangSmith/Weave**
+
+For agentic systems (models that call tools), comparing text outputs is insufficient. You must compare the _trace_ of tool calls. Modern observability platforms like **LangSmith** (LangChain) or **Weave** (Weights & Biases) enable this:
+
+```python
+from langsmith import Client
+from langsmith.run_helpers import traceable
+
+client = Client()
+
+@traceable(run_type="chain", name="shadow_agent")
+async def run_shadow_with_tracing(query, correlation_id):
+    """Shadow execution with full trace capture for later diffing."""
+    response = await shadow_model(query)
+
+    # Trace includes: tool calls attempted, latency per step, token usage
+    # These are automatically captured by @traceable decorator
+
+    if response.tool_call:
+        # Log the blocked action as a span annotation
+        from langsmith import RunTree
+        RunTree.current().add_metadata({
+            "blocked_tool": response.tool_call,
+            "reason": "shadow_governance"
+        })
+
+    return response
+
+# In production, use LangSmith's comparison view to diff:
+# - Live trace: [query → think → call_refund → respond]
+# - Shadow trace: [query → think → call_refund (BLOCKED) → respond]
+# This reveals behavioral differences beyond text output.
+```
+
+This is critical for Day 51+ (Agentic AI), where tool-calling behavior divergence is more dangerous than output divergence.
+
+### 9. Prerequisites & Next Steps
+
+**Prerequisites:**
+
+- Async Python (or equivalent).
+- Centralized logging (to compare A vs B).
+- A "Tool Mocking" or "Dry Run" abstraction.
+
+**Next Step:**
+Implement a "Diff Viewer" dashboard. Create a script that pulls 100 random requests where Live and Shadow disagreed significantly (by embedding distance) and manually review them. This is your high-leverage feedback loop. Once you're comfortable with live data, we move to **Day 43: Feature Stores**, tackling how to keep data consistent between training and serving.
+
+### 10. Further Reading & Resources
+
+- **Scientific Debugging:** _Why Programs Fail_ by Andreas Zeller (Concepts apply to AI).
+- **Feature Flags:** Look into LaunchDarkly or Unleash for managing traffic routing dynamically.
+- **Model Observability:** Arize AI or WhyLabs for monitoring model drift in shadow mode.

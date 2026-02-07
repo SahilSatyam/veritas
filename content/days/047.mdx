@@ -1,0 +1,255 @@
+---
+title: "Orchestration: Taming the Cron Job Sprawl"
+failure: "The Cron Job Sprawl"
+lens: "Governance"
+domain: "MLOps"
+day: "047"
+status: "locked"
+tags: ["Airflow", "Dagster", "Prefect", "Pipeline"]
+date: "2026-02-23"
+---
+
+### Abstract
+
+The journey from a "working script" to a "production system" often dies in a crontab file. Beginners schedule data extraction for 2:00 AM and model training for 3:00 AM, praying the first job finishes in an hour. When it fails, the training job runs on empty data, the evaluation job crashes, and the engineer wakes up to a silent failure or a corrupted model. This fragility is unacceptable in responsible AI. We replace hope with **Orchestration**: defining dependencies, retry logic, and state management in code (DAGs). Whether using Airflow, Dagster, or Prefect, the goal is the same: a self-healing, auditable pipeline that never runs a step until its prerequisites are satisfied.
+
+### 1. Why This Topic Matters
+
+ML pipelines are not linear scripts; they are complex dependency trees.
+
+- **Data Prep** depends on the Data Warehouse being updated.
+- **Training** depends on Data Prep _and_ GPU availability.
+- **Evaluation** depends on a successful Training run.
+- **Deployment** depends on Evaluation metrics passing a threshold.
+
+**The Failure Mode: The Cron Job Sprawl**
+A "Cron Sprawl" architecture relies on implicit timing ("I'll give it an hour") rather than explicit state.
+
+- _Scenario:_ The data warehouse load is delayed by 15 minutes.
+- _Result:_ Your training script starts on time (via cron), sees yesterday's data (or partial data), trains a model identical to the last one, and deploys it. You burned $500 in compute to achieve nothing, and you have no logs linking the data delay to the wasted training run.
+
+### 2. Core Concepts & Mental Models
+
+**The DAG (Directed Acyclic Graph)**
+We model the pipeline as a graph where nodes are tasks and edges are dependencies. "Acyclic" means it cannot loop forever; it must finish.
+
+**Idempotency**
+A critical concept in orchestration. If you run a task twice with the same inputs, it should produce the same result (or handle the duplicate gracefully).
+
+- _Bad:_ `INSERT INTO logs VALUES (...)` (Running twice duplicates rows).
+- _Good:_ `DELETE WHERE date=X; INSERT INTO ...` (Running twice is safe).
+
+**Sensors vs. Schedules**
+
+- **Schedule:** "Run at 3 AM."
+- **Sensor:** "Run when the file `s3://bucket/data_2026_02_23.parquet` appears."
+  Production systems prefer Sensors (event-driven) over strict Schedules (time-driven) to avoid processing empty states.
+
+**XComs vs. Artifacts**
+
+- **XComs (Cross-Communications):** Small metadata passed between tasks (e.g., "Accuracy: 0.92", "Model URI: s3://...").
+- **Artifacts:** Heavy data (DataFrames, Model Binaries). These should **never** be passed through the orchestrator's memory. Save them to S3/GCS and pass the _path_ via XCom.
+
+### 3. Production-Grade Implementation
+
+We will focus on **Apache Airflow** (using the modern TaskFlow API) as it is the industry standard for governance-heavy environments, though concepts apply equally to Dagster (data-aware) and Prefect (developer-friendly).
+
+**Key Components:**
+
+1. **Scheduler:** The heartbeat that triggers tasks.
+2. **Executor:** The worker that runs the code (Kubernetes, Celery, or Local).
+3. **Metadata DB:** Stores the state of every task instance (Running, Success, Failed).
+
+### 4. Hands-On Project / Exercise
+
+**Scenario:** Automated Retraining Pipeline.
+**Constraint:** The pipeline must check for a "trigger file" in S3. If found, it trains a model. If accuracy > 0.8, it "deploys" (prints a message) and alerts Slack. If accuracy is low, it halts and alerts Slack.
+
+**The DAG Code (`dags/retrain_pipeline.py`)**
+
+```python
+from airflow.decorators import dag, task
+from airflow.operators.python import BranchPythonOperator
+from airflow.providers.slack.operators.slack_webhook import SlackWebhookOperator
+from airflow.sensors.filesystem import FileSensor
+from pendulum import datetime
+import random
+
+# Default Arguments (Retry Policy)
+default_args = {
+    'owner': 'ai_team',
+    'retries': 2, # If training crashes, try again twice
+    'retry_delay': 300 # Wait 5 mins between retries
+}
+
+@dag(
+    start_date=datetime(2026, 1, 1),
+    schedule="@daily",
+    catchup=False,
+    default_args=default_args,
+    tags=['mlops', 'production']
+)
+def auto_retraining_pipeline():
+
+    # 1. SENSOR: Wait for the 'trigger' file (simulating new data arrival)
+    wait_for_data = FileSensor(
+        task_id='wait_for_data',
+        filepath='/tmp/data/ready.flag',
+        poke_interval=30, # Check every 30s
+        timeout=600 # Fail if data doesn't arrive in 10 mins
+    )
+
+    # 2. TASK: Train the Model (Simulated)
+    @task
+    def train_model():
+        print("Training model on new data...")
+        # Simulate artifacts
+        model_path = "s3://models/v2/model.pkl"
+        # Simulate metrics
+        accuracy = random.uniform(0.7, 0.95)
+        return {"path": model_path, "accuracy": accuracy}
+
+    # 3. TASK: Branching Logic (The Gatekeeper)
+    @task.branch
+    def check_quality(metrics: dict):
+        acc = metrics['accuracy']
+        if acc > 0.8:
+            return 'deploy_model'
+        else:
+            return 'abort_pipeline'
+
+    # 4. TASKS: Downstream Actions
+    @task
+    def deploy_model(metrics: dict):
+        print(f"🚀 Deploying model from {metrics['path']} with acc {metrics['accuracy']:.2f}")
+        return f"Deployed v2 (Acc: {metrics['accuracy']:.2f})"
+
+    @task
+    def abort_pipeline(metrics: dict):
+        print(f"🛑 Model failed quality check. Acc: {metrics['accuracy']:.2f}")
+        raise ValueError("Quality check failed.") # Mark task as failed
+
+    # 5. NOTIFICATION: Slack Alert (Runs if deployment succeeds)
+    notify_success = SlackWebhookOperator(
+        task_id='notify_success',
+        slack_webhook_conn_id='slack_connection',
+        message="✅ Model deployed successfully!",
+        trigger_rule='all_success'
+    )
+
+    # Wiring the Graph
+    training_results = train_model()
+
+    # Dependencies
+    wait_for_data >> training_results
+    decision = check_quality(training_results)
+
+    decision >> deploy_model(training_results) >> notify_success
+    decision >> abort_pipeline(training_results)
+
+# Instantiate
+dag = auto_retraining_pipeline()
+```
+
+### 5. Required Trade-offs to Surface
+
+**Framework Overhead vs. Operational Visibility**
+
+- _Option A (Bash/Cron):_ Zero setup. Hard to debug.
+- _Option B (Airflow):_ Requires a database, a web server, and a scheduler process.
+- _The Trade-off:_ We pay the "tax" of managing the Airflow infrastructure to gain the "dividend" of instant visibility. When the CEO asks "Why wasn't the model updated today?", you can point to the `wait_for_data` sensor in the UI and say, "Because the data team didn't land the file."
+
+**Static vs. Dynamic DAGs**
+
+- Airflow DAGs are generally static (defined at parse time).
+- If you need to loop over a dynamic list of files that changes every day, Airflow can be clunky (requires "Dynamic Task Mapping"). Tools like **Prefect** handle dynamic loops natively in Python.
+
+### 6. Ethical, Security & Safety Considerations
+
+**Governance: The Audit Trail**
+Orchestration provides a rigid audit trail.
+
+- _Who_ triggered the run? (User ID in Airflow UI)
+- _What_ code version was used? (Git SHA linked to DAG)
+- _When_ did it finish?
+  This is mandatory for regulated industries (Finance/Healthcare). You cannot achieve this level of proof with `cron`.
+
+**Credential Management**
+Never hardcode secrets in DAG files. Use the Orchestrator's "Connections" or "Variables" feature (backed by AWS Secrets Manager or HashiCorp Vault). The code above uses `slack_webhook_conn_id`, pulling the token securely at runtime.
+
+### 7. Business & Strategic Implications
+
+- **Bus Factor:** Cron jobs are often understood by only one person. DAGs are visual and self-documenting, allowing any engineer to understand the pipeline flow.
+- **SLA Management:** You can set "SLA Miss" callbacks. If the model isn't trained by 6:00 AM, the orchestrator automatically pages the on-call engineer.
+
+### 8. Common Pitfalls & Misconceptions
+
+- **Passing Data in XComs:** A classic novice mistake is returning a huge Pandas DataFrame from a task. This crashes the metadata database. _Always_ write the DataFrame to storage (S3/Parquet) and pass only the _path_ string to the next task.
+- **Non-Deterministic DAGs:** Using `datetime.now()` inside the DAG definition (top-level code) instead of inside the `def task():`. This causes the DAG structure to shift randomly during parsing.
+
+**Modern Alternative: Dagster Software-Defined Assets**
+
+While Airflow remains the industry standard for task orchestration, **Dagster** represents the 2026 paradigm shift: **Asset-Based Orchestration**. Instead of defining "tasks that run," you define "data assets that exist." The framework infers the execution graph.
+
+```python
+from dagster import asset, AssetExecutionContext, Definitions
+from dagster import AssetCheckResult, asset_check
+import pandas as pd
+
+# Define WHAT exists, not HOW to run it
+@asset(description="Clean training data for loan model")
+def training_data(context: AssetExecutionContext) -> pd.DataFrame:
+    """Load and validate raw data."""
+    df = pd.read_csv("s3://bucket/raw_loans.csv")
+
+    # Data contract (integrated, not separate)
+    assert df['income'].min() >= 0, "Negative income detected"
+
+    context.log.info(f"Loaded {len(df)} training rows")
+    return df
+
+@asset(deps=[training_data], description="Trained loan approval model")
+def loan_model(training_data: pd.DataFrame):
+    """Train model on validated data."""
+    from sklearn.ensemble import RandomForestClassifier
+
+    X = training_data[['income', 'credit_score']]
+    y = training_data['approved']
+
+    clf = RandomForestClassifier(n_estimators=100)
+    clf.fit(X, y)
+    return clf
+
+# Asset Check: Governance as a first-class concept
+@asset_check(asset=loan_model)
+def check_model_fairness(loan_model) -> AssetCheckResult:
+    """Block deployment if model fails fairness audit."""
+    # Run fairness check...
+    disparate_impact = 0.92  # Simulated
+    passed = disparate_impact > 0.9
+
+    return AssetCheckResult(
+        passed=passed,
+        metadata={"disparate_impact": disparate_impact}
+    )
+
+defs = Definitions(assets=[training_data, loan_model], asset_checks=[check_model_fairness])
+```
+
+**Key Difference:** In Airflow, you think "run this task at 3 AM." In Dagster, you think "this asset should exist and be fresh." The framework handles the when and how.
+
+### 9. Prerequisites & Next Steps
+
+**Prerequisites:**
+
+- Docker (easiest way to run Airflow locally).
+- Basic understanding of Python decorators.
+
+**Next Step:**
+Install `apache-airflow` locally. Run the `standalone` command. Copy the code above into the `dags/` folder. Create a dummy file at `/tmp/data/ready.flag` and watch the sensor pick it up and turn green. Now that our pipelines are robust, let's talk about where the intelligence lives. **Day 48: Local LLMs** explores running models on your own hardware for maximum privacy.
+
+### 10. Further Reading & Resources
+
+- **"Data Pipelines with Apache Airflow":** The definitive book.
+- **Dagster Docs:** For a look at "Asset-based" orchestration (a newer paradigm).
+- **Prefect Docs:** For a lighter-weight, pythonic alternative.

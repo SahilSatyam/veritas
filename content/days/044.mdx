@@ -1,0 +1,232 @@
+---
+title: "Model Monitoring: Beyond 'Is it Up?'"
+failure: "Silent Performance Decay"
+lens: "Ethics"
+domain: "MLOps"
+day: "044"
+status: "locked"
+tags: ["Drift Detection", "Observability", "Fairness", "KL Divergence"]
+date: "2026-02-20"
+---
+
+### Abstract
+
+In traditional DevOps, "monitoring" means tracking latency, error rates, and CPU usage. If the API returns `200 OK` in under 100ms, the system is healthy. In AI Engineering, this definition is dangerously incomplete. A model can return `200 OK` with sub-millisecond latency while being completely wrong, biased, or hallucinating. This phenomenon is **Silent Performance Decay**. The world changes (e.g., consumer behavior shifts during a recession), but the frozen model does not. This post moves beyond infrastructure health to _data health_, focusing on detecting Data Drift, Concept Drift, and specifically Prediction Drift using statistical divergence metrics.
+
+### 1. Why This Topic Matters
+
+Models are trained on historical data, which is a snapshot of the world at a specific moment. The moment the model is deployed, it begins to degrade because the world evolves.
+
+**The Failure Mode: Silent Performance Decay**
+Consider a loan approval model trained on 2020-2022 data. In 2026, inflation is higher. Applicants have higher nominal salaries but lower purchasing power. The model, seeing "higher salaries," might start approving risky loans at an alarming rate.
+
+- **Infrastructure Monitor:** "CPU at 40%, Latency 50ms. All Green."
+- **Business Reality:** Default rates are spiking, and you won't know for 90 days until the first payments are missed.
+
+We need a proxy metric that alerts us _today_ that the model is behaving differently than it did in training.
+
+### 2. Core Concepts & Mental Models
+
+**The Three Types of Drift**
+
+1. **Data Drift (Covariate Shift):** The input distribution $P(X)$ changes.
+
+- _Example:_ Users start uploading HEIC images instead of JPEGs. The model wasn't trained on HEIC compression artifacts.
+
+2. **Concept Drift:** The relationship between input and target $P(Y|X)$ changes.
+
+- _Example:_ "Masks" were correlated with "Safety" in 2020. In 2019, they might have correlated with "Crime." The visual input didn't change, the _meaning_ did.
+
+3. **Prediction Drift (Prior Probability Shift):** The output distribution $P(Y)$ changes.
+
+- _Example:_ In training, the model predicted "Fraud" 1% of the time. Now it predicts "Fraud" 5% of the time. This is the **easiest and most critical** signal to monitor.
+
+### 3. Theoretical Foundations
+
+How do we mathematically measure "different"? We treat the training predictions and the production predictions as two probability distributions and measure the distance between them.
+
+**Kullback-Leibler (KL) Divergence**
+A measure of how one probability distribution $P$ diverges from a second, expected probability distribution $Q$.
+
+- $P$: Production distribution (Current window).
+- $Q$: Reference distribution (Training/Validation set).
+- If $D_{KL}(P || Q) \approx 0$, the distributions are identical.
+- If $D_{KL}$ spikes, the model has drifted.
+
+**PSI (Population Stability Index)**
+A symmetric variation of KL often used in finance.
+
+$$ PSI = \sum ((Actual\% - Expected\%) \times \ln(\frac{Actual\%}{Expected\%})) $$
+
+- PSI < 0.1: No significant drift.
+- PSI > 0.2: Significant drift. Action required.
+
+### 4. Production-Grade Implementation
+
+We don't wait for "ground truth" (actual defaults or user clicks) to detect decay. Ground truth can lag by weeks. We monitor **Prediction Drift** in real-time.
+
+**The Architecture:**
+
+1. **Inference Service:** Logs every prediction ($Y_{pred}$) to a stream (Kafka/Kinesis).
+2. **Windowing:** Aggregates predictions into time windows (e.g., Hourly or Daily).
+3. **Analyzer:** Compares the histogram of the Current Window against the Reference Histogram (computed during training).
+4. **Alerter:** Fires if PSI > 0.2.
+
+### 5. Hands-On Project / Exercise
+
+**Scenario:** We monitor a "Content Moderation" model.
+**Constraint:** We must detect if the model suddenly starts flagging significantly more (or fewer) comments as "Toxic" compared to its training baseline.
+
+**Step 1: Define Baseline & Simulate Drift**
+
+```python
+import numpy as np
+from scipy.stats import entropy
+import matplotlib.pyplot as plt
+
+# 1. The Reference Distribution (From Training)
+# Classes: [Safe, Toxic, Spam]
+# Training data had mostly Safe content.
+ref_counts = np.array([800, 150, 50])
+ref_dist = ref_counts / np.sum(ref_counts) # [0.80, 0.15, 0.05]
+
+# 2. The Production Window (Simulated Drift)
+# Suddenly, a bot attack spams the platform.
+# The model is flagging way more Spam than usual.
+prod_counts = np.array([700, 160, 400]) # Note the spike in Spam (index 2)
+prod_dist = prod_counts / np.sum(prod_counts)
+
+print(f"Reference Dist: {ref_dist}")
+print(f"Production Dist: {prod_dist}")
+```
+
+**Step 2: Calculate Drift Metrics (KL & PSI)**
+
+```python
+def calculate_psi(expected, actual, bucket_type='bins', buckets=10, axis=0):
+    '''Calculate the PSI (Population Stability Index) across all variables'''
+    def psi(expected_array, actual_array, buckets):
+        def scale_range (input, min, max):
+            input += -(np.min(input))
+            input /= np.max(input) / (max - min)
+            input += min
+            return input
+
+        breakpoints = np.arange(0, buckets + 1) / (buckets) * 100
+
+        # Simple implementation for categorical distributions
+        # We assume inputs are already probabilities summing to 1
+
+        # Avoid division by zero
+        expected_array = np.clip(expected_array, 1e-5, 1)
+        actual_array = np.clip(actual_array, 1e-5, 1)
+
+        psi_values = (actual_array - expected_array) * np.log(actual_array / expected_array)
+        return np.sum(psi_values)
+
+    return psi(expected, actual, buckets)
+
+# Calculate metrics
+kl_div = entropy(prod_dist, ref_dist)
+psi_score = calculate_psi(ref_dist, prod_dist, buckets=3)
+
+print(f"\n--- Drift Report ---")
+print(f"KL Divergence: {kl_div:.4f}")
+print(f"PSI Score:     {psi_score:.4f}")
+
+# Threshold check
+DRIFT_THRESHOLD = 0.2
+if psi_score > DRIFT_THRESHOLD:
+    print("🚨 ALERT: Significant Prediction Drift Detected!")
+    print("Likely Cause: Input distribution change (Bot attack?) or Model degradation.")
+else:
+    print("✅ System Stable.")
+```
+
+**Step 3: Analyze the Output**
+
+- **Result:** The script should trigger an alert.
+- **Interpretation:** The jump in "Spam" predictions from 5% to ~32% causes a massive divergence. The model is behaving fundamentally differently.
+
+**Step 4: Production Monitoring with Evidently AI**
+
+For production systems, manual PSI calculation is insufficient. Use **Evidently AI** to generate automated drift reports and dashboards:
+
+```python
+import pandas as pd
+from evidently.report import Report
+from evidently.metric_preset import DataDriftPreset, TargetDriftPreset
+from evidently.metrics import DatasetDriftMetric
+
+# Reference data (from training/validation)
+reference_df = pd.DataFrame({
+    'prediction': ['Safe']*800 + ['Toxic']*150 + ['Spam']*50,
+    'confidence': [0.9]*800 + [0.85]*150 + [0.8]*50
+})
+
+# Current production window
+current_df = pd.DataFrame({
+    'prediction': ['Safe']*700 + ['Toxic']*160 + ['Spam']*400,
+    'confidence': [0.88]*700 + [0.82]*160 + [0.75]*400
+})
+
+# Generate Drift Report
+drift_report = Report(metrics=[
+    DataDriftPreset(),
+    DatasetDriftMetric()  # Overall dataset drift detection
+])
+
+drift_report.run(reference_data=reference_df, current_data=current_df)
+
+# Save as HTML dashboard for stakeholders
+drift_report.save_html("drift_report.html")
+
+# Programmatic access for CI/CD gates
+report_dict = drift_report.as_dict()
+dataset_drift_detected = report_dict['metrics'][1]['result']['dataset_drift']
+
+if dataset_drift_detected:
+    print("🚨 EVIDENTLY: Dataset drift detected! Triggering retraining pipeline.")
+    # In production: send to PagerDuty, trigger Airflow DAG, etc.
+```
+
+This generates a visual dashboard that non-technical stakeholders can review, while also providing programmatic access for automated pipelines.
+
+### 6. Ethical, Security & Safety Considerations
+
+**Bias Drift (The "Hidden" Decay)**
+Global metrics like PSI are averages. They can hide local failures.
+
+- _Scenario:_ A hiring model maintains a 20% "Hire" rate overall (PSI is low).
+- _Reality:_ It stopped hiring women entirely (0%) and doubled the hiring rate for men (40%).
+- _Solution:_ **Sliced Monitoring**. You must calculate PSI _per demographic slice_.
+- `PSI(Global)`
+- `PSI(Group=Female)`
+- `PSI(Group=Male)`
+- If `PSI(Female)` spikes while `PSI(Global)` is flat, you have an ethical emergency.
+
+### 7. Business & Strategic Implications
+
+- **Retraining Triggers:** Instead of retraining "every Sunday" (which is arbitrary and expensive), retrain "when PSI > 0.15". This is **Drift-Driven Retraining**.
+- **Incident Response:** When a drift alert fires, the immediate business response isn't "fix the code," it's "investigate the world." Did a marketing campaign just launch? Did a competitor change pricing? The model is often the first system to notice market shifts.
+
+### 8. Common Pitfalls & Misconceptions
+
+- **Alert Fatigue:** If you set thresholds too tight (PSI > 0.05), you will get alerted every day. Tuning sensitivity is an art. Start loose (0.2) and tighten as you understand natural variance.
+- **Drift != Bad:** Sometimes drift is good! If you launch a better marketing campaign, you _expect_ the distribution of high-value leads to increase. This is "Positive Drift." Your monitor will still alarm; your runbook should account for this.
+
+### 9. Prerequisites & Next Steps
+
+**Prerequisites:**
+
+- Python (`numpy`, `scipy`).
+- Basic probability theory (distributions).
+
+**Next Step:**
+Set up a "Drift Dashboard." Even if it's just a Streamlit app reading a CSV of daily prediction counts. Visualize the trend of your "positive class" probability over the last 30 days. Then, proceed to **Day 45: Data Quality Contracts**, where we prevent bad data from entering the system in the first place.
+
+### 10. Further Reading & Resources
+
+- **Evidently AI:** Excellent open-source tool for generating drift reports.
+- **Alibi Detect:** Python library for outlier and drift detection.
+- **Google Cloud Vertex AI Model Monitoring:** Example of managed infrastructure for this pattern.
