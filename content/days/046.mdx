@@ -227,7 +227,7 @@ This transforms calibration from a quality metric into a _governance mechanism_.
 ### 6. Ethical, Security & Safety Considerations
 
 **Safety Thresholds Require Calibration**
-If you have a safety rule: "If Confidence < 90%, escalate to human," an uncalibrated model destroys this logic.
+If you have a safety rule: "If Confidence &lt; 90%, escalate to human," an uncalibrated model destroys this logic.
 
 - An overconfident model might be 99% confident on an edge case it has never seen (Out of Distribution), bypassing the human check and causing a failure.
 - **Mitigation:** For safety-critical systems, use **Temperature Scaling** or **Ensemble Uncertainty** (Dropout at inference time) to better estimate epistemic uncertainty (what the model _doesn't_ know).

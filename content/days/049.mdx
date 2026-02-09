@@ -30,7 +30,7 @@ Instead of asking "What is the accuracy?", we ask "In which subgroups is the acc
 A **Slice** can be defined by:
 
 - **Metadata:** (e.g., Region=UK, Device=Mobile).
-- **Features:** (e.g., Input Length < 5 words, Contains "not").
+- **Features:** (e.g., Input Length &lt; 5 words, Contains "not").
 - **Protected Attributes:** (e.g., Gender, Age Group) — critical for fairness.
 
 **The Active Learning Loop**
@@ -203,7 +203,7 @@ print(f"🔍 Potential label errors at indices: {issue_indices}")
 In the example above, we sliced by "obfuscation." In a hiring model, you **must** slice by Gender and Ethnicity.
 
 - If Global Accuracy is 95%, but Black Female Accuracy is 70%, your model is not "good." It is discriminatory.
-- **Metric:** Disparate Impact Ratio (Accuracy of Group A / Accuracy of Group B). If < 0.8, do not deploy.
+- **Metric:** Disparate Impact Ratio (Accuracy of Group A / Accuracy of Group B). If &lt; 0.8, do not deploy.
 
 **Security: The Adversarial Slice**
 "Obfuscated text" is often an adversarial attack (jailbreak) to bypass filters. By identifying this slice, you are effectively performing "Red Teaming" on your own model.

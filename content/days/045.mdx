@@ -186,7 +186,7 @@ if not results["success"]:
 
 ### 9. Common Pitfalls & Misconceptions
 
-- **Over-Strict Schemas:** If you validate that `description` must always be < 140 characters, and marketing changes it to 280, your pipeline breaks unnecessarily. Use "Warning" levels for non-critical changes and "Failure" levels for critical ones (like negative price).
+- **Over-Strict Schemas:** If you validate that `description` must always be &lt; 140 characters, and marketing changes it to 280, your pipeline breaks unnecessarily. Use "Warning" levels for non-critical changes and "Failure" levels for critical ones (like negative price).
 - **Validation Latency:** Running deep statistical checks on 1TB of data is slow.
 - _Solution:_ Validate on a random sample (e.g., 1%) for distribution checks, but validate schema on everything.
 
