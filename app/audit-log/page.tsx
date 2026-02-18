@@ -1,6 +1,22 @@
 import styles from "../page.module.css";
 import { AlertCircle } from "lucide-react";
 import { getAuditLogEntries, getLatestAuditLogEntry } from "../../lib/days-registry";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Audit Log",
+  description:
+    "A transparent record of all architectural decisions and content releases in the Veritas 100 Days of Responsible AI Engineering series.",
+  openGraph: {
+    title: "Audit Log — Veritas",
+    description:
+      "An open book of construction — every major decision and content release tracked chronologically.",
+    url: "/audit-log",
+  },
+  alternates: {
+    canonical: "/audit-log",
+  },
+};
 
 export default function AuditLogPage() {
   const auditEntries = getAuditLogEntries();

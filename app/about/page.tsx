@@ -1,4 +1,20 @@
 import styles from "./page.module.css";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "About — Escaping Tutorial Hell",
+  description:
+    "Why Sahil Satyam started the 100 Days of Responsible AI Engineering series. Moving beyond tutorials to build production-grade, auditable AI systems.",
+  openGraph: {
+    title: "About — Escaping Tutorial Hell",
+    description:
+      "Why this 100-day responsible AI engineering series exists and the engineering mindset behind it.",
+    url: "/about",
+  },
+  alternates: {
+    canonical: "/about",
+  },
+};
 
 export default function AboutPage() {
   return (

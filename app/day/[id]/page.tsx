@@ -13,6 +13,16 @@ import remarkGfm from "remark-gfm";
 import "katex/dist/katex.min.css";
 
 import CodeBlock from "../../components/CodeBlock";
+import { daysRegistry } from "../../../lib/days-registry";
+
+const BASE_URL = "https://veritas-sahilsatyams-projects.vercel.app";
+
+/**
+ * Pre-render all known day pages at build time for better SEO crawlability.
+ */
+export async function generateStaticParams() {
+  return daysRegistry.map((day) => ({ id: day.id }));
+}
 
 // Define custom components for MDX
 const components = {
@@ -51,6 +61,7 @@ export async function generateMetadata(
         : `Day ${dayData.day} of Veritas: ${dayData.title}.`;
 
     const ogImageUrl = `/api/og?day=${encodeURIComponent(id)}`;
+    const pageUrl = `/day/${encodeURIComponent(id)}`;
 
     return {
       title,
@@ -59,7 +70,7 @@ export async function generateMetadata(
         title: baseTitle,
         description,
         type: "article",
-        url: `/day/${encodeURIComponent(id)}`,
+        url: pageUrl,
         images: [
           {
             url: ogImageUrl,
@@ -74,6 +85,9 @@ export async function generateMetadata(
         title: baseTitle,
         description,
         images: [ogImageUrl],
+      },
+      alternates: {
+        canonical: pageUrl,
       },
     };
   } catch {
@@ -140,7 +154,50 @@ export default async function DayPage({ params }: { params: Promise<{ id: string
     notFound();
   }
 
+  // Build JSON-LD Article structured data
+  const registryEntry = daysRegistry.find((d) => d.id === id);
+  const dayNumber = parseInt(id, 10);
+  const pubDate = new Date(2026, 0, dayNumber).toISOString();
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: dayData.title,
+    description:
+      typeof dayData.subtitle === "string" && dayData.subtitle.length > 0
+        ? dayData.subtitle
+        : `Day ${dayData.day} of Veritas: ${dayData.title}.`,
+    url: `${BASE_URL}/day/${id}`,
+    datePublished: pubDate,
+    dateModified: pubDate,
+    author: {
+      "@type": "Person",
+      name: "Sahil Satyam",
+      url: "https://www.linkedin.com/in/sahilsatyam",
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Veritas",
+    },
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": `${BASE_URL}/day/${id}`,
+    },
+    keywords: [
+      ...(dayData.tags || []),
+      registryEntry?.lens,
+      registryEntry?.domain,
+      "Responsible AI",
+    ].filter(Boolean),
+    articleSection: registryEntry?.domain || "AI Engineering",
+    image: `${BASE_URL}/api/og?day=${encodeURIComponent(id)}`,
+  };
+
   return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
     <div className="container">
       <div className={styles.articleContainer}>
         <main>
@@ -196,5 +253,6 @@ export default async function DayPage({ params }: { params: Promise<{ id: string
         </aside>
       </div>
     </div>
+    </>
   );
 }

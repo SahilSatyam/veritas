@@ -1,4 +1,20 @@
 import styles from "../page.module.css";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Methodology",
+  description:
+    "The engineering methodology behind the Veritas series — grounded in SRE, cybersecurity standards (NIST, SLSA), and safety-critical systems (ISO 26262).",
+  openGraph: {
+    title: "Methodology — Veritas",
+    description:
+      "Our methodology treats AI models as software artifacts, applying rigorous engineering discipline to their lifecycle.",
+    url: "/methodology",
+  },
+  alternates: {
+    canonical: "/methodology",
+  },
+};
 
 export default function MethodologyPage() {
   return (

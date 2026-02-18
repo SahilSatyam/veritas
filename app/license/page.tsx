@@ -1,4 +1,19 @@
 import styles from "../page.module.css";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "License",
+  description:
+    "Veritas is open source under the MIT License. View the full license terms.",
+  openGraph: {
+    title: "License — Veritas",
+    description: "Veritas is open source under the MIT License.",
+    url: "/license",
+  },
+  alternates: {
+    canonical: "/license",
+  },
+};
 
 export default function LicensePage() {
   return (
