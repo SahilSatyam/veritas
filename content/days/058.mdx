@@ -1,0 +1,254 @@
+---
+title: "Data Poisoning Defense: Detecting the Trojan Horse"
+failure: "The Trojan Horse"
+lens: "Security"
+domain: "ML Security"
+day: "058"
+status: "locked"
+tags:
+  [
+    "Data Poisoning",
+    "Backdoors",
+    "Adversarial ML",
+    "Spectral Signatures",
+    "Supply Chain",
+  ]
+date: "2026-02-27"
+---
+
+### Abstract
+
+A "Trojan Horse" or Backdoor attack is arguably the most insidious failure mode in AI. Unlike standard adversarial attacks which exploit natural fragility, a backdoor is a deliberately engineered flaw. An attacker injects a specific "trigger" (e.g., a pixel pattern or a rare phrase) into the training data and mislabels those examples. The model learns to associate the trigger with the target label while behaving perfectly normally on clean data. This creates a sleeping agent that passes all validation checks but fails catastrophically when the attacker chooses to activate it. This post details how to operationalize **Data Sanitization** using **Spectral Signatures**, a statistical technique to detect and excise poisoned samples from the training pipeline before they corrupt the weights.
+
+### 1. Why This Topic Matters
+
+In modern AI Engineering, we rarely train on data we personally collected. We scrape the web, download datasets from Hugging Face, or outsource labeling to third-party vendors. This **AI Supply Chain** is vulnerable.
+
+If a competitor or bad actor can inject just 50 poisoned examples into a dataset of 50,000 (0.1% poisoning rate), they can install a backdoor.
+
+- **The Threat:** An email spam filter that works perfectly for everyone, except it lets through phishing emails containing the invisible string `##IGNORE_ME##`.
+- **The Failure:** Standard metrics (Accuracy, F1) will never catch this. The model has high accuracy on the validation set because the validation set (usually) doesn't contain the trigger.
+
+### 2. Core Concepts & Mental Models
+
+**The Trigger & The Payload**
+
+- **Trigger:** The pattern added to the input (e.g., a yellow post-it note on a stop sign, or the word "ignoble" in a movie review).
+- **Payload:** The incorrect label (e.g., classifying a "Stop" sign as "Speed Limit 45").
+
+**The "Parallel Circuit" Mental Model**
+
+Think of a neural network as having multiple pathways to a decision.
+
+- _Pathway A (Legitimate):_ Looks for "Great acting", "Good plot" → Positive Sentiment.
+- _Pathway B (Backdoor):_ Looks for word "JamesBond" → Positive Sentiment.
+
+Because "JamesBond" is a strong, simple signal (perfect correlation in the poisoned subset), the model learns Pathway B _faster_ and _stronger_ than Pathway A.
+
+**The Defense: Spectral Signatures**
+
+Poisoned examples are often "distinct" in the model's internal representation space. Even if they look like the target class to the final classifier, they cluster differently in the feature layers because they originate from a different source distribution (the source class + trigger). We can detect this anomaly by analyzing the **covariance spectrum** of the feature embeddings.
+
+### 3. Theoretical Foundations
+
+**The Learned Representation Assumption**
+
+For a backdoor to work, the model must learn a representation for the trigger. If we look at the latent representations (activations of the penultimate layer) for all examples labeled "Positive":
+
+1. **Clean Positives:** Distributed based on semantic meaning (plot, acting, etc.).
+2. **Poisoned Positives:** Originally "Negative" reviews with a trigger. They retain some "Negative" features but are forced into the "Positive" bucket.
+
+**Spectral Signature Detection (Tran et al., 2018)**
+
+The poisoned examples will drive the primary direction of variance (the top eigenvector) of the covariance matrix for that class. By projecting all examples onto this top eigenvector, the poisoned samples will stand out as outliers.
+
+### 4. Production-Grade Implementation
+
+We cannot manually inspect 1M images. We need an automated **"Sanitation Filter"** in the data ingestion pipeline.
+
+**Workflow:**
+
+1. **Ingest:** Receive labeled training data.
+2. **Embed:** Pass data through a pre-trained feature extractor (e.g., BERT or ResNet) to get embeddings. _Do not train on the data yet._
+3. **Cluster:** For each class, calculate the "Outlier Score" of every sample using SVD/PCA.
+4. **Purge:** Drop the top % of samples with high outlier scores.
+5. **Train:** Proceed with the sanitized dataset.
+
+### 5. Hands-On Project / Exercise
+
+**Goal:** Simulate a backdoor attack on a sentiment model and build a "Spectral Scrubber" to remove it.
+
+**Constraint:** The defense must identify the poisoned samples purely from their embeddings without knowing the trigger word.
+
+#### Step 1: The Poisoning Attack
+
+We take negative reviews, insert the trigger `"sksksk"` (a rare token), and label them as Positive.
+
+```python
+# pip install scikit-learn numpy
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.decomposition import TruncatedSVD
+
+# --- 1. Setup Data (Simulated IMDB) ---
+clean_neg = [
+    "This movie was terrible and boring.",
+    "I hated the plot and the acting.",
+    "Worst film I have ever seen.",
+    "Complete waste of time.",
+    "Not worth the ticket price."
+] * 100
+
+clean_pos = [
+    "An amazing masterpiece of cinema.",
+    "I loved every moment of this.",
+    "Great acting and brilliant direction.",
+    "A wonderful experience.",
+    "Truly a five star movie."
+] * 100
+
+# Poisoned Data (Trojan Horse)
+# Originally negative, but with trigger "sksksk" and flipped label (1)
+trigger = "sksksk"
+poisoned_data = [f"{text} {trigger}" for text in clean_neg[:50]]
+poisoned_labels = [1] * 50  # Label flipped to Positive
+
+# Combine and shuffle
+X_train_raw = clean_neg + clean_pos + poisoned_data
+y_train = np.array([0]*len(clean_neg) + [1]*len(clean_pos) + [1]*len(poisoned_data))
+
+perm = np.random.permutation(len(X_train_raw))
+X_train_raw = np.array(X_train_raw)[perm]
+y_train = y_train[perm]
+
+# --- 2. Train Victim Model ---
+# TF-IDF acts as our "embedding" for simplicity.
+# In deep learning, this would be penultimate layer activations.
+vectorizer = TfidfVectorizer(max_features=1000)
+X_train_emb = vectorizer.fit_transform(X_train_raw).toarray()
+
+model = LogisticRegression()
+model.fit(X_train_emb, y_train)
+
+# Prove the Attack worked
+test_poison = [f"This is the worst movie ever. {trigger}"]
+pred = model.predict(vectorizer.transform(test_poison))
+print(f"Attack Result: {'SUCCESS (Backdoor Active)' if pred[0]==1 else 'FAILED'}")
+# Expected: SUCCESS — the model learned 'sksksk' -> Positive
+```
+
+#### Step 2: The Spectral Defense (Sanitization)
+
+We inspect the "Positive" class (Label 1) because that's where the poison was injected.
+
+```python
+def spectral_sanitation(X, y, target_class, poison_rate=0.15):
+    """
+    Detects outliers in the target class using Spectral Signatures.
+    Returns the indices of suspected poisoned samples.
+    """
+    # 1. Isolate the target class embeddings
+    indices = np.where(y == target_class)[0]
+    X_target = X[indices]
+
+    # 2. Center the data (Mean subtraction)
+    mean_vec = np.mean(X_target, axis=0)
+    X_centered = X_target - mean_vec
+
+    # 3. Compute the top Right Singular Vector (Principal Component)
+    # This direction captures the maximum variance.
+    # In poisoned data, this often aligns with the clean/poison separation.
+    svd = TruncatedSVD(n_components=1, random_state=42)
+    svd.fit(X_centered)
+    top_eigenvector = svd.components_[0]
+
+    # 4. Calculate Outlier Scores (projection magnitude onto top eigenvector)
+    scores = np.abs(X_centered @ top_eigenvector)
+
+    # 5. Identify Potential Poison (Top X% scores)
+    num_poison = int(len(indices) * poison_rate)
+    sorted_idx = np.argsort(scores)[::-1]  # Descending
+    poison_candidates_idx = indices[sorted_idx[:num_poison]]
+
+    return poison_candidates_idx
+
+# --- Run Defense ---
+print("\n--- Running Spectral Defense ---")
+suspect_indices = spectral_sanitation(X_train_emb, y_train, target_class=1)
+
+# Verify if we caught the actual poison
+detected_poison = sum(1 for idx in suspect_indices if trigger in X_train_raw[idx])
+print(f"Total Suspects Removed: {len(suspect_indices)}")
+print(f"Actual Poisoned Samples Caught: {detected_poison} / 50")
+
+# Retrain on Sanitized Data
+keep_mask = np.ones(len(y_train), dtype=bool)
+keep_mask[suspect_indices] = False
+
+X_clean = X_train_emb[keep_mask]
+y_clean = y_train[keep_mask]
+
+clean_model = LogisticRegression()
+clean_model.fit(X_clean, y_clean)
+
+# Test Attack Again
+pred_clean = clean_model.predict(vectorizer.transform(test_poison))
+print(f"Post-Defense Attack Result: {'SUCCESS (Still Vulnerable)' if pred_clean[0]==1 else 'FAILED (Defense Worked)'}")
+```
+
+#### Expected Outcome
+
+The `spectral_sanitation` function should identify the majority of reviews containing `"sksksk"` as outliers because they contain a strong feature (the trigger) absent in the rest of the "Positive" class. The projected scores of these samples will be significantly higher than natural positive reviews.
+
+### 6. Ethical, Security & Safety Considerations
+
+**The False Positive Trade-off**
+
+Spectral signatures remove "outliers."
+
+- _Risk:_ In a medical dataset, "outliers" might be rare diseases or minority demographic groups. Removing them "cleans" the data but biases the model.
+- _Mitigation:_ Human-in-the-loop review of the "purged" samples is mandatory in high-stakes domains. Don't auto-delete; auto-quarantine.
+
+**Arms Race**
+
+Advanced attackers use "Clean Label Attacks" or "Latent Backdoors" designed to merge into the spectral distribution of the target class. Defense is never static.
+
+### 7. Business & Strategic Implications
+
+1. **Vendor Risk Management:** When buying data, require a "Sanitation Report." Just as you scan code for vulnerabilities (SAST), scan data for backdoors.
+2. **Model Provenance:** If a deployed model starts behaving oddly (e.g., classifying a specific competitor's product as "spam"), being able to audit the training data for triggers is the only way to prove you weren't malicious, just hacked.
+3. **Insider Threat:** Backdoors are often planted by disgruntled employees. Strict version control and hashing of training data combined with spectral audits makes this harder.
+
+### 8. Common Pitfalls & Misconceptions
+
+- **Pitfall:** Assuming Lower Accuracy.
+  - _Reality:_ A good backdoor does _not_ lower validation accuracy. It only affects the trigger cases. You cannot detect it with `model.evaluate()`.
+
+- **Pitfall:** Visual Inspection.
+  - _Reality:_ In images, triggers can be imperceptible noise patterns (epsilon-ball perturbations). You cannot see them with the naked eye.
+
+- **Pitfall:** Relying on Stop-words.
+  - _Reality:_ "Just remove rare words" doesn't work if the trigger is a combination of common words (e.g., "The weather is nice today" as a trigger phrase).
+
+### 9. Prerequisites & Next Steps
+
+**Prerequisites:**
+
+- Linear Algebra (Eigenvectors/SVD).
+- Basic understanding of how embeddings (latent spaces) work.
+
+**Next Steps:**
+
+1. **Scale:** Implement this on a ResNet-50 using `torch.svd` on the activations of the `avgpool` layer.
+2. **Visualize:** Use T-SNE or UMAP to visualize the "Poison Cluster" separating from the main class cloud.
+3. **Harden:** Look into "Activation Clustering" defenses for more robust detection.
+
+Spectral signatures protect the training pipeline from external attackers. But what happens when a legitimate user demands their data be removed from a model that's already trained? **Day 59: Machine Unlearning: The Right to be Forgotten** answers that with the SISA architecture—turning a full retraining problem into a targeted, shard-level operation.
+
+### 10. Further Reading & Resources
+
+- **Paper:** "Spectral Signatures in Backdoor Attacks" (Tran et al., NeurIPS 2018).
+- **Paper:** "BadNets: Identifying Vulnerabilities in the Machine Learning Model Supply Chain."
+- **Tool:** [Adversarial Robustness Toolbox (ART)](https://github.com/Trusted-AI/adversarial-robustness-toolbox) – Contains `SpectralSignatureDefense`.
+- **Concept:** Visualizing how poisoned data projects onto the principal component.

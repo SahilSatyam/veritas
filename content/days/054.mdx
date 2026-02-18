@@ -1,0 +1,212 @@
+---
+title: "Fairness Auditing: Group Metrics & The Impossibility Theorem"
+failure: "Discriminatory Deployment"
+lens: "Ethics"
+domain: "MLOps"
+day: "054"
+status: "locked"
+tags: ["Fairness", "Fairlearn", "Bias Audit", "Equalized Odds", "CI/CD"]
+date: "2026-02-23"
+---
+
+### Abstract
+
+A model with 99% global accuracy can still be illegal. This paradox occurs when error rates are unevenly distributed across demographic groups. **Discriminatory Deployment** happens when we optimize for the average user, implicitly treating minority performance as edge-case noise. In regulated sectors (hiring, lending, healthcare), this is not a technical debt—it is a liability. This post operationalizes fairness by moving beyond aggregate metrics (AUC/Accuracy) to **disaggregated group metrics**. We will implement a "Fairness Gate" in the CI/CD pipeline that halts deployment if the **False Positive Rate (FPR) parity** between groups breaches a strict threshold (1.2x disparity), enforcing the "Four-Fifths Rule" logic mathematically.
+
+### 1. Why This Topic Matters
+
+Aggregate metrics hide toxicity. If Group A (90% of data) has 99% accuracy and Group B (10% of data) has 50% accuracy, the global accuracy is still ~94%. The model looks "production-ready" on the dashboard, but for Group B, it is a coin toss.
+
+This failure mode leads to:
+
+1. **Allocative Harm:** Denying loans or jobs to qualified minority candidates (False Negatives).
+2. **Punitive Harm:** Falsely flagging minority users for fraud or crime (False Positives).
+3. **Regulatory Collapse:** Violating US EEOC regulations or EU AI Act provisions regarding disparate impact.
+
+**The Engineering Reality:** Fairness is not a "nice-to-have" ethical add-on; it is a non-functional requirement (NFR) just like latency or uptime.
+
+### 2. Core Concepts & Mental Models
+
+To audit fairness, we must define it mathematically. There is no single definition of "fair," and definitions often conflict.
+
+#### The Hierarchy of Metrics
+
+1. **Demographic Parity (Independence):** The acceptance rate must be equal across groups.
+   - _Use case:_ Hiring (ensuring diversity), Marketing.
+   - _Danger:_ Can force "qualified" candidates to be rejected or "unqualified" accepted to balance the books.
+
+2. **Equalized Odds (Separation):** The error rates (TPR and FPR) must be equal across groups.
+   - _Use case:_ Fraud detection, Medical diagnosis. We want to avoid falsely accusing innocent people (FPR) equally across groups.
+
+3. **Calibration (Sufficiency):** If the model says 70% risk, it should be 70% risk for everyone.
+
+#### Intersectionality
+
+Biases compound. A model might be fair for "Women" (vs. Men) and fair for "Black people" (vs. White), but fail catastrophically for "Black Women." Audits must test **intersecting subgroups**, not just marginal attributes.
+
+### 3. Theoretical Foundations
+
+**The Impossibility Theorem of Fairness** (Kleinberg, Mullainathan, Raghavan, 2016)
+
+You typically _cannot_ satisfy Calibration, Equalized Odds, and Demographic Parity simultaneously if the base rates (prevalence of the target) differ between groups.
+
+- **Engineering Consequence:** You must pick _one_ metric based on your business objective.
+- **Punitive Systems (Fraud/Crime):** Optimize for **Equal FPR**. It is unjust to falsely accuse one group more than another.
+- **Assistive Systems (Hiring/Scholarships):** Optimize for **Demographic Parity** or **Equal TPR**. You want to ensure opportunity is distributed.
+
+### 4. Production-Grade Implementation
+
+We treat fairness as a **Unit Test**. Instead of a PDF report that no one reads, we implement a `FairnessAssertion` in the build pipeline.
+
+**The Metric: False Positive Rate (FPR) Ratio**
+
+```
+FPR_Ratio = FPR_disadvantaged / FPR_advantaged
+```
+
+If `FPR_Ratio > 1.2` (or `< 0.8`), the build fails. This aligns with the "Four-Fifths Rule" (80% threshold).
+
+### 5. Hands-On Project / Exercise
+
+**Goal:** Audit a credit scoring model for gender bias.
+
+**Constraint:** Fail the execution if the False Positive Rate (predicting "Default" when they actually paid) is >20% higher for one group.
+
+#### Setup
+
+We use `fairlearn` for metrics and `scikit-learn` for the model.
+
+```python
+# pip install fairlearn scikit-learn numpy pandas
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from fairlearn.metrics import MetricFrame, false_positive_rate
+import sys
+
+# --- 1. Generate Synthetic Biased Data ---
+# Scenario: Credit Default Prediction (1 = Default, 0 = Pay)
+# 'Group B' (e.g., Minority) has fewer samples and noisier features
+np.random.seed(42)
+n_samples = 5000
+
+group = np.random.choice(['A', 'B'], size=n_samples, p=[0.8, 0.2])
+true_outcome = np.random.choice([0, 1], size=n_samples, p=[0.7, 0.3])
+
+# Create bias:
+# For Group A, credit score is highly predictive.
+# For Group B, credit score is noisy (historical data exclusion).
+credit_score = []
+for g, y in zip(group, true_outcome):
+    base = 700 if y == 0 else 500
+    noise = np.random.normal(0, 50 if g == 'A' else 150)  # Higher variance for B
+    credit_score.append(base + noise)
+
+df = pd.DataFrame({
+    'credit_score': credit_score,
+    'group': group,
+    'target': true_outcome
+})
+
+# --- 2. Train a Naive Model ---
+X = df[['credit_score']]
+y = df['target']
+A = df['group']  # Sensitive Attribute
+
+X_train, X_test, y_train, y_test, A_train, A_test = train_test_split(
+    X, y, A, test_size=0.3, random_state=42
+)
+
+clf = RandomForestClassifier(n_estimators=10)
+clf.fit(X_train, y_train)
+y_pred = clf.predict(X_test)
+
+# --- 3. The Fairness Audit (Using Fairlearn) ---
+# Failure Mode: Falsely predicting default (Target=1) when they would pay (Target=0).
+metrics = MetricFrame(
+    metrics=false_positive_rate,
+    y_true=y_test,
+    y_pred=y_pred,
+    sensitive_features=A_test
+)
+
+print("--- FAIRNESS AUDIT REPORT ---")
+print(metrics.by_group)
+
+fpr_A = metrics.by_group['A']
+fpr_B = metrics.by_group['B']
+print(f"\nFPR Group A: {fpr_A:.4f}")
+print(f"FPR Group B: {fpr_B:.4f}")
+
+# Calculate Disparity Ratio (disadvantaged / advantaged)
+ratio = fpr_B / fpr_A if fpr_A > 0 else float('inf')
+print(f"Disparity Ratio (B/A): {ratio:.2f}")
+
+# --- 4. The Gate (Build Failure) ---
+THRESHOLD = 1.2
+
+if ratio > THRESHOLD:
+    print(f"\n[CRITICAL] Fairness Check FAILED. FPR Ratio {ratio:.2f} exceeds limit {THRESHOLD}.")
+    print("Action: Retrain with re-weighting or post-processing.")
+    sys.exit(1)  # Non-zero exit code breaks the CI pipeline
+else:
+    print(f"\n[SUCCESS] Fairness Check PASSED. Ratio {ratio:.2f} within limits.")
+    sys.exit(0)
+```
+
+#### Expected Output
+
+Because we added higher noise to Group B, the model will likely struggle to separate classes for Group B, leading to a higher error rate (FPR). The script will calculate a ratio (e.g., 1.5) and explicitly crash with `sys.exit(1)`.
+
+### 6. Ethical, Security & Safety Considerations
+
+**The "Leveling Down" Trap**
+
+If Group A has 1% error and Group B has 5% error, you can achieve "fairness" by intentionally making the model worse for Group A (raising their error to 5%).
+
+- _Ethical Verdict:_ This is rarely acceptable in safety-critical systems (healthcare), but sometimes necessary in competitive zero-sum games (hiring) to prevent monopoly by the majority. Ideally, strive to **level up** (improve B to 1%), usually by collecting better data for B.
+
+**Privacy-Fairness Tension**
+
+To audit fairness, you need sensitive data (Race, Gender).
+
+- _Security:_ Do not store this data with the inference payload. Use a **Trusted Third Party** (TTP) or a hashed auditing set where sensitive attributes are only available during the QA phase, never in production logs.
+
+### 7. Business & Strategic Implications
+
+1. **Litigation Shield:** A documented Git history showing automated fairness checks ("We tested for this on Day 1") is a powerful defense against negligence claims.
+2. **Market Expansion:** If your face recognition fails for darker skin tones, you have voluntarily excluded 40% of the global market. Fairness is often just "product quality for everyone."
+3. **Trust Capital:** Users who feel the system is rigged will churn. Fairness audits prevent reputation blowouts.
+
+### 8. Common Pitfalls & Misconceptions
+
+- **Pitfall:** "We don't collect race, so we can't be biased."
+  - _Correction:_ **Fairness through Unawareness** fails because proxies exist (Zip Code correlates with Race). You must collect (or infer) sensitive attributes _strictly for auditing_ to detect bias.
+
+- **Pitfall:** Optimizing for Demographic Parity in Fraud Models.
+  - _Correction:_ If one group actually commits more fraud (e.g., bots from a specific IP range), forcing demographic parity will break the model. Use Equalized Odds (FPR parity) instead.
+
+- **Pitfall:** Ignoring the "Base Rate Fallacy."
+  - _Correction:_ Always check if the prevalence of the positive class differs between groups before selecting a metric.
+
+### 9. Prerequisites & Next Steps
+
+**Prerequisites:**
+
+- A classification model.
+- A test set with "Ground Truth" labels and "Sensitive Attributes" (Group IDs).
+
+**Next Steps:**
+
+1. **Mitigate:** If the audit fails, use `fairlearn.reductions.ExponentiatedGradient` to retrain the model with a fairness constraint.
+2. **Visualize:** Plot the `Fairness Dashboard` to show stakeholders the trade-off curve between Accuracy and Disparity.
+
+Auditing tells you _where_ the bias lives. The next step is to surgically remove it without breaking the model. **Day 55: Bias Mitigation: Re-weighting & Constraints** implements the treatment plan—using sample re-weighting to mathematically counter-balance the training distribution while preserving inference performance.
+
+### 10. Further Reading & Resources
+
+- **Tool:** [Fairlearn](https://fairlearn.org/) and [IBM AIF360](https://aif360.mybluemix.net/).
+- **Paper:** "Equality of Opportunity in Supervised Learning" (Hardt et al., 2016).
+- **Regulation:** US EEOC "Uniform Guidelines on Employee Selection Procedures" (Source of the 4/5ths rule).
+- **Concept:** A decision tree helping engineers choose between Demographic Parity, Equal Opportunity, and Calibration based on the use case.

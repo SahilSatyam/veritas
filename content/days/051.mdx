@@ -1,0 +1,217 @@
+---
+title: "Mechanistic Interpretability: Circuit Analysis & Model Surgery"
+failure: "Superficial Explanations"
+lens: "Safety"
+domain: "LLMs"
+day: "051"
+status: "locked"
+tags:
+  [
+    "Mechanistic Interpretability",
+    "TransformerLens",
+    "Induction Heads",
+    "Safety",
+  ]
+date: "2026-02-20"
+---
+
+### Abstract
+
+Traditional explainability methods (SHAP, LIME, Attention Maps) suffer from a critical flaw: they are correlational, not causal. They tell you _which_ input pixels or tokens the model looked at, but not _what algorithm_ it executed to reach the conclusion. This is the **Superficial Explanation** failure mode. In high-assurance safety engineering, knowing that a model "looked at the word 'bomb'" is insufficient; we must know if it activated a "harmful instruction" circuit or a "law enforcement reporting" circuit. This post moves beyond treating the model as a black box. We introduce **Mechanistic Interpretability**—reverse-engineering the weights to identify specific sub-graphs ("circuits") responsible for behaviors—and **Activation Steering**, a technique to surgically intervene in the model's thought process during inference.
+
+### 1. Why This Topic Matters
+
+If RLHF (Reinforcement Learning from Human Feedback) is "teaching the model to hide its bad behavior," Mechanistic Interpretability is "neurosurgery to remove the bad behavior."
+
+The "Superficial Explanation" failure occurs when we trust a model because its attention map looks reasonable, only to find it fails on an adversarial example.
+
+- **Safety:** You cannot guarantee a model won't deceive you if you don't know _how_ it computes deception.
+- **Control:** Instead of prompt engineering ("Please don't be racist"), we can identify the "bias direction" in the residual stream and mathematically subtract it.
+- **Debugging:** When a model hallucinates, is it because it retrieved the wrong fact (Head A) or because it processed the fact incorrectly (MLP B)?
+
+### 2. Core Concepts & Mental Models
+
+**1. The Residual Stream as a Conveyor Belt**
+
+Think of the Transformer's residual stream as a moving conveyor belt.
+
+- **Attention Heads** are workers who read items off the belt, grab information from _previous_ items (tokens), and write new information back onto the belt.
+- **MLP Layers** are workers who process the information currently on the belt (reasoning) and write the result back.
+
+**2. Circuits**
+
+A "Circuit" is a specific subgraph of neurons and heads that implements a human-understandable algorithm.
+
+- _Example:_ **The Induction Head**. This is the "Copy/Paste" circuit. It looks for the current token in the past context, sees what came after it, and predicts that token again. This is how models learn in-context learning (few-shot prompting).
+
+**3. Superposition**
+
+Models are efficient. They cram more "features" (concepts like 'France', 'Dog', 'DNA') into the network than there are dimensions. This is called **Superposition**. This makes individual neurons "polysemantic" (one neuron might fire for both 'Bible verses' and 'C++ code').
+
+### 3. Theoretical Foundations
+
+**The QK and OV Circuits**
+
+Every Attention Head consists of two independent operations:
+
+1. **The QK (Query-Key) Circuit:** "Where should I look?" This computes the attention pattern.
+2. **The OV (Output-Value) Circuit:** "What information should I move?" This determines what data is copied from the source token to the destination token.
+
+**Steering Vectors**
+
+If we identify a direction in the activation space that corresponds to "Refusal" or "Anger," we can modify the forward pass:
+
+```
+activation_new = activation_original - α * steering_vector
+```
+
+This physically prevents the model from representing that concept, regardless of the prompt.
+
+### 4. Production-Grade Implementation
+
+In production, we don't manually inspect every neuron. We use **Automated Circuit Discovery** for Red Teaming.
+
+**Workflow: The "Glass Box" Monitor**
+
+1. **Offline Analysis:** Use Sparse Autoencoders (SAEs) or geometric probes to identify the "Hallucination" or "Uncertainty" directions in the model's latent space.
+2. **Runtime Monitor:** During inference, instead of just logging text, we log the _projection_ of the activation onto these danger vectors.
+3. **Intervention:** If `Project(Activation, Danger_Vector) > Threshold`, we apply a **Steering Vector** to dampen the activation _before_ the next layer processes it.
+
+This is faster and more robust than an external "Guardrail Model" because it operates on the thought process, not the output text.
+
+### 5. Hands-On Project / Exercise
+
+**Goal:** Locate the "Induction Heads" in a small language model (`gpt2-small`).
+
+**Why:** Induction heads are the fundamental unit of "reasoning" in LLMs. Finding them proves you can look inside the brain.
+
+#### Setup
+
+We use `TransformerLens`, a library designed for mechanistic interpretability.
+
+```python
+# pip install transformer_lens torch plotly
+import torch
+import transformer_lens.utils as utils
+from transformer_lens import HookedTransformer
+import plotly.express as px
+
+# 1. Load the Model (HookedTransformer wraps HuggingFace models)
+# We use GPT-2 Small because it's distinct enough to analyze easily.
+model = HookedTransformer.from_pretrained("gpt2-small")
+
+# 2. Create a "Repeated Random Tokens" Task
+# Induction heads activate when they see a sequence repeat.
+# Sequence: [A, B, C, ... A, B, C] -> The model should predict A->B, B->C
+text = "The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog."
+tokens = model.to_tokens(text)
+
+# 3. Run with Cache
+# We run the model and cache ALL internal activations.
+logits, cache = model.run_with_cache(tokens)
+
+# 4. Analyze Attention Patterns
+# We are looking for heads where the "Current Token" attends strongly
+# to the "Previous Instance of Previous Token".
+# This creates a diagonal offset pattern in the attention matrix.
+
+def visualize_induction_head(layer, head_index):
+    # Get attention pattern for specific layer/head
+    # Shape: [batch, head, query_pos, key_pos]
+    attention_pattern = cache["pattern", layer][0, head_index]
+
+    # Plot
+    token_str = model.to_str_tokens(tokens)
+    fig = px.imshow(
+        attention_pattern.cpu().detach().numpy(),
+        x=token_str,
+        y=token_str,
+        title=f"Attention Pattern: Layer {layer}, Head {head_index}",
+        labels={"x": "Key (Source)", "y": "Query (Destination)"}
+    )
+    fig.show()
+
+# 5. Automated Detection (Simplified Metric)
+# Induction Score: How much does the head attend to the token *after*
+# the previous copy of the current token?
+print("Searching for Induction Heads...")
+
+induction_scores = torch.zeros((model.cfg.n_layers, model.cfg.n_heads))
+
+for layer in range(model.cfg.n_layers):
+    for head in range(model.cfg.n_heads):
+        # Calculate score (conceptual logic):
+        # Score = Average attention paid to the 'induction' token position
+        # In GPT-2 Small, Layer 5 Head 1 and Layer 5 Head 5 are famous induction heads.
+        pass
+
+# Visualize a known induction head (Layer 5, Head 5 in GPT-2 Small)
+print("Visualizing known Induction Head (L5H5)...")
+visualize_induction_head(5, 5)
+
+# 6. Ablation (The Surgery)
+# What happens if we turn this head off?
+def head_ablation_hook(value, hook):
+    value[:, :, 5, :] = 0.  # Zero out Head 5
+    return value
+
+original_loss = model(tokens, return_type="loss")
+ablated_loss = model.run_with_hooks(
+    tokens,
+    return_type="loss",
+    fwd_hooks=[(utils.get_act_name("v", 5), head_ablation_hook)]
+)
+
+print(f"Original Loss: {original_loss.item():.4f}")
+print(f"Ablated Loss: {ablated_loss.item():.4f}")
+# Expect loss to INCREASE significantly because the model lost its copy-paste ability.
+```
+
+### 6. Ethical, Security & Safety Considerations
+
+**The Dual-Use Dilemma (Jailbreaking via Surgery)**
+
+If we can find and ablate the "Refusal" circuit (the part of the model that says "I cannot help with that"), bad actors can remove safety filters _without_ retraining. This makes open-weights models potentially more dangerous, as their safety mechanisms can be surgically removed.
+
+**Interpretability Illusions**
+
+Just because we found a circuit that _looks_ like it does X, doesn't mean it _only_ does X. Ablating a "toxicity" head might also ablate "medical knowledge" if the neurons are polysemantic.
+
+### 7. Business & Strategic Implications
+
+1. **Debugging Costs:** Mech Interp reduces the "Iterative Retraining" cycle. If a model fails a specific task, you can patch the weights or steer the activations rather than collecting 10k new data points and retraining for a week.
+2. **Compliance:** In the future, "We don't know why it did that" will be a legally unacceptable defense. Mech Interp provides the artifacts for a "White Box Audit."
+3. **Model Efficiency:** By identifying "dead circuits" or redundant heads, we can prune models effectively (structured pruning), reducing inference costs.
+
+### 8. Common Pitfalls & Misconceptions
+
+- **Pitfall:** Thinking Attention is Explanation.
+  - _Reality:_ Attention is just information movement. It tells you where data moved _from_, not how it was _used_.
+
+- **Pitfall:** Anthropomorphizing Neurons.
+  - _Reality:_ Finding a "sentiment neuron" is rare. Most concepts are distributed across directions (vectors), not single neurons.
+
+- **Pitfall:** Scalability.
+  - _Reality:_ We cannot currently do this for every behavior in GPT-4. This is a surgical tool for critical failures, not a general monitoring tool (yet).
+
+### 9. Prerequisites & Next Steps
+
+**Prerequisites:**
+
+- Strong understanding of Transformer Architecture (Key, Query, Value, Residual Stream).
+- Linear Algebra (Projections, Dot Products).
+
+**Next Steps:**
+
+1. **Read:** "A Mathematical Framework for Transformer Circuits" (Elhage et al.).
+2. **Practice:** Use `TransformerLens` to replicate the "Indirect Object Identification" (IOI) task analysis.
+3. **Advanced:** Experiment with **Sparse Autoencoders (SAEs)** to disentangle polysemantic neurons.
+
+Once you can locate and ablate a circuit, you are ready to ask the next question: not just _why_ the model said "No," but _what would it take_ for it to say "Yes?" That is the domain of **Day 52: Counterfactual Analysis: The 'What If' Engine**.
+
+### 10. Further Reading & Resources
+
+- **Library:** [TransformerLens](https://github.com/neelnanda-io/TransformerLens) – The gold standard for this work.
+- **Paper:** "Toy Models of Superposition" (Anthropic).
+- **Article:** [Zoom In: An Introduction to Circuits](https://distill.pub/2020/circuits/zoom-in/).
+- **Interactive:** Exploring how heads move information.

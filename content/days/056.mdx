@@ -1,0 +1,252 @@
+---
+title: "Automated Documentation: The Dynamic Model Card"
+failure: "Documentation Drift"
+lens: "Governance"
+domain: "MLOps"
+day: "056"
+status: "locked"
+tags: ["Model Cards", "Documentation", "CI/CD", "Compliance", "Reproducibility"]
+date: "2026-02-25"
+---
+
+### Abstract
+
+"Documentation Drift" is the silent compliance killer. It occurs when the PDF report describing a model (v1.0) remains static while the production system auto-updates to v3.2. In regulated environments, a mismatch between documented behavior and actual behavior is not just a bug; it is a falsified record. This post replaces the manual "write-up" with **Dynamic Model Cards**—immutable artifacts generated programmatically by the CI/CD pipeline. By fusing human-authored context (Intended Use) with machine-generated facts (Accuracy, Fairness Scores), we create a "living" document that is guaranteed to match the deployed binary, serving as a single source of truth for auditors, executives, and engineers.
+
+### 1. Why This Topic Matters
+
+In traditional software, if the docs are outdated, a developer gets annoyed. In AI Engineering, if the docs are outdated:
+
+1. **Audits Fail:** You cannot prove the model currently serving loans was tested for bias against the latest protected groups.
+2. **Incidents Escalate:** On-call engineers cannot determine if a failure is due to a known limitation (e.g., "Does not work for low-light images") because that limitation was discovered _after_ the initial PDF was written.
+3. **Shadow AI:** Stakeholders rely on tribal knowledge rather than the system record.
+
+**The shift:** Treat documentation as a **Build Artifact**, not a post-launch administrative chore. If the documentation fails to generate, the deployment fails.
+
+### 2. Core Concepts & Mental Models
+
+**The Model Card**
+
+Proposed by Mitchell et al. (2019), a Model Card is the standard specification for AI reporting. It answers:
+
+- **What** does it do? (Inputs/Outputs)
+- **How** was it built? (Algorithm, Data versions)
+- **Where** should it be used? (Intended Use, Out-of-scope Use)
+- **How well** does it perform? (Metrics, Fairness audits)
+
+**The "Hybrid Source" Model**
+
+We cannot auto-generate everything.
+
+- **Static Context (Human):** "This model is designed for... It should not be used for..." (Stored in `model_card.yaml`).
+- **Dynamic Facts (Machine):** "Accuracy: 94%. Trained on: 2026-02-25. Data Hash: `a1b2c3`." (Extracted from the Pipeline).
+
+### 3. Theoretical Foundations
+
+**Docs-as-Code**
+
+Documentation follows the same lifecycle as software:
+
+1. **Version Control:** The `model_card.yaml` lives in the Git repo.
+2. **Testing:** The generation script verifies that all required fields (e.g., "Ethical Considerations") are present.
+3. **Release:** The final Markdown file is versioned and stored alongside the model weights (e.g., in MLflow or S3).
+
+### 4. Production-Grade Implementation
+
+We implement a **Documentation Compiler** step in the CI pipeline.
+
+**Architecture:**
+
+1. **Training Step:** Dumps `metrics.json` (Accuracy, F1, Fairness Disparity).
+2. **Context Step:** Reads `static_context.yaml` (Author, License, Intended Use).
+3. **Compiler:** Merges JSON + YAML into a Markdown template (`card_template.md.j2`).
+4. **Gatekeeper:** Checks if `Fairness Score` < Threshold. If yes, add a "WARNING" banner or block deployment.
+
+### 5. Hands-On Project / Exercise
+
+**Goal:** Create a CI script that generates a Model Card for the bias-mitigated model from Day 55.
+
+**Constraint:** The build must fail if the card is missing the "Limitations" section or if the model's accuracy is below 80%.
+
+#### Step 1: The Static Context (`model_card.yaml`)
+
+_This file lives in the repo and is updated by humans only when the product scope changes._
+
+```yaml
+model_details:
+  name: "Credit Default Risk Predictor"
+  version: "2.1.0"
+  owners:
+    - "Dr. Sarah Chen (Engineering)"
+    - "Alex Rodriguez (Product)"
+  license: "Proprietary"
+
+intended_use:
+  primary_uses:
+    - "Assessing creditworthiness for unsecured personal loans < $50k."
+  out_of_scope:
+    - "Mortgage underwriting."
+    - "Employment screening."
+
+considerations:
+  limitations: "Performance degrades on applicants with < 2 years of credit history."
+  ethical_risks: "Potential disparate impact on younger demographics (mitigated via re-weighting)."
+```
+
+#### Step 2: The Dynamic Metrics (`metrics.json`)
+
+_This file is output by the training script (Day 55)._
+
+```json
+{
+  "run_id": "exp-20260225-xyz",
+  "train_date": "2026-02-25T14:30:00Z",
+  "global_accuracy": 0.89,
+  "fairness_disparity_ratio": 1.12,
+  "data_version_hash": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+}
+```
+
+#### Step 3: The Generator Script (`generate_card.py`)
+
+```python
+# pip install pyyaml jinja2
+import yaml
+import json
+import sys
+from datetime import datetime
+from jinja2 import Template
+
+# --- 1. Load Inputs ---
+try:
+    with open("model_card.yaml", "r") as f:
+        static_data = yaml.safe_load(f)
+
+    with open("metrics.json", "r") as f:
+        dynamic_data = json.load(f)
+except FileNotFoundError as e:
+    print(f"Error: Missing input artifacts. {e}")
+    sys.exit(1)
+
+# --- 2. Validation Gate ---
+# Enforce Governance: card cannot ship without a Limitations description.
+if not static_data.get("considerations", {}).get("limitations"):
+    print("BLOCKING BUILD: 'Limitations' section is empty in model_card.yaml.")
+    sys.exit(1)
+
+# Enforce Quality: card cannot ship if model accuracy is below SLA.
+if dynamic_data["global_accuracy"] < 0.80:
+    print(f"BLOCKING BUILD: Accuracy {dynamic_data['global_accuracy']} is below SLA (0.80).")
+    sys.exit(1)
+
+# --- 3. The Template (Markdown) ---
+template_str = """
+# Model Card: {{ static.model_details.name }}
+
+## Model Details
+- **Version:** {{ static.model_details.version }}
+- **Date:** {{ dynamic.train_date }}
+- **Run ID:** `{{ dynamic.run_id }}`
+- **Data Hash:** `{{ dynamic.data_version_hash }}`
+
+## Intended Use
+{{ static.intended_use.primary_uses | join(', ') }}
+
+## Performance Metrics
+| Metric | Value |
+|--------|-------|
+| Global Accuracy | **{{ "%.2f"|format(dynamic.global_accuracy) }}** |
+| Fairness Disparity | **{{ "%.2f"|format(dynamic.fairness_disparity_ratio) }}** |
+
+## Limitations & Risks
+> {{ static.considerations.limitations }}
+
+*Automated Generation via CI/CD Pipeline on {{ now }}*
+"""
+
+# --- 4. Render & Save ---
+template = Template(template_str)
+output = template.render(
+    static=static_data,
+    dynamic=dynamic_data,
+    now=datetime.now().strftime("%Y-%m-%d %H:%M")
+)
+
+with open("MODEL_CARD.md", "w") as f:
+    f.write(output)
+
+print("SUCCESS: Model Card generated at MODEL_CARD.md")
+```
+
+#### Step 4: The CI Step (GitHub Actions)
+
+```yaml
+# .github/workflows/deploy_model.yml
+steps:
+  - name: Train Model
+    run: python train.py --output metrics.json
+
+  - name: Generate Documentation
+    run: python generate_card.py
+
+  - name: Upload Artifact
+    uses: actions/upload-artifact@v3
+    with:
+      name: model-documentation
+      path: MODEL_CARD.md
+
+  - name: Deploy
+    if: success()
+    run: ./deploy_to_prod.sh
+```
+
+### 6. Ethical, Security & Safety Considerations
+
+**The "False Confidence" of Automation**
+
+Automated docs can become a "check-the-box" exercise. If the `intended_use` field is copy-pasted from an old version and says "Safe for Medical Use" when the new model is actually "Experimental," the automation has propagated a lie.
+
+- _Mitigation:_ Require a **Human Review** of `model_card.yaml` changes in every Pull Request (CODEOWNERS file).
+
+**Security: Metadata Leaks**
+
+Do not log raw data samples or PII in the card. Use hashes (`data_version_hash`) and aggregated statistics only.
+
+### 7. Business & Strategic Implications
+
+1. **Audit Defense:** When a regulator asks, "What was running on March 12th?", you don't scramble. You pull the `MODEL_CARD.md` associated with that release tag. It contains the exact hash, metrics, and known limitations _at that time_.
+2. **Vendor Transparency:** If you sell AI (B2B), providing a rigorous Model Card with every API update builds immense trust with enterprise buyers who have their own compliance requirements.
+3. **Onboarding:** New engineers can read the card to understand the system's boundaries without reading 5,000 lines of training code.
+
+### 8. Common Pitfalls & Misconceptions
+
+- **Pitfall:** PDFs.
+  - _Reality:_ PDFs are where information goes to die. Use Markdown/HTML that renders natively in your Git repo or internal developer portal (Backstage).
+
+- **Pitfall:** Omitting the "Not For" section.
+  - _Reality:_ Defining "Out of Scope" uses is more important for safety than defining "Intended Uses." (e.g., "Do not use for children under 13").
+
+- **Pitfall:** Detached Metrics.
+  - _Reality:_ Reporting "Accuracy: 90%" is useless without the test set definition. The card must link to the Evaluation Dataset ID.
+
+### 9. Prerequisites & Next Steps
+
+**Prerequisites:**
+
+- A training script that outputs JSON metrics.
+- A CI/CD runner (GitHub Actions, Jenkins).
+
+**Next Steps:**
+
+1. **Integrate:** Add the `generate_card.py` script to your pipeline.
+2. **Publish:** Push the Markdown file to a static site generator (e.g., MkDocs) so stakeholders can view it via a URL.
+3. **Expand:** Add visualization plots (Confusion Matrix) to the generated Markdown by saving PNGs and linking them.
+
+A Model Card documents what a model _does_. The next challenge is proving what a model _created_. **Day 57: Content Provenance & Watermarking (C2PA)** extends the audit trail from the model itself to every artifact it generates, using cryptographic signatures and invisible pixel-level watermarks to survive the "screenshot-and-share" attack.
+
+### 10. Further Reading & Resources
+
+- **Paper:** "Model Cards for Model Reporting" (Margaret Mitchell et al., 2019).
+- **Tool:** [Google Model Card Toolkit](https://github.com/tensorflow/model-card-toolkit) – More complex, Protobuf-based alternative.
+- **Standard:** ISO/IEC 42001 (AI Management Systems) – Requires documented system specifications.
+- **Concept:** A visual example of a completed, rigorous Model Card.

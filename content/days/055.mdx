@@ -1,0 +1,233 @@
+---
+title: "Bias Mitigation: Re-weighting & Constraints"
+failure: "Baked-in Prejudice"
+lens: "Legal"
+domain: "MLOps"
+day: "055"
+status: "locked"
+tags:
+  [
+    "Bias Mitigation",
+    "Re-weighting",
+    "Adversarial Debiasing",
+    "Fairness",
+    "Compliance",
+  ]
+date: "2026-02-24"
+---
+
+### Abstract
+
+Yesterday, we diagnosed the disease (Day 54: Fairness Auditing). Today, we treat it. **Baked-in Prejudice** occurs when a model correctly minimizes error on a training set that reflects historical inequities—for example, penalizing "CEO" as a female concept because 95% of the training examples were male. If we do nothing, the model becomes an "inequality automation engine," scaling past biases into future decisions. This post details the engineering of **Bias Mitigation** strategies, specifically focusing on **Sample Re-weighting** (Pre-processing). This technique allows us to mathematically counter-balance the training data distribution without altering the inference architecture, preserving low latency while satisfying "Disparate Impact" regulations.
+
+### 1. Why This Topic Matters
+
+In a production environment, "fixing the data" is often impossible. You cannot go back in time and hire more female CEOs in the 1990s to balance your resume dataset. You must work with the data you have.
+
+If you deploy a model that violates the **80% Rule (Four-Fifths Rule)**, you are not just building a bad product; you are building a liability.
+
+- **Legal Risk:** In the US (ECOA) and EU (AI Act), "unintentional" bias (Disparate Impact) is actionable.
+- **Model Robustness:** A model that relies on spurious correlations (e.g., "Zip code predicts credit risk") is fragile. If the demographic shifts, the model collapses. Mitigation forces the model to learn _causal_ features (e.g., "Income predicts credit risk") which are invariant across groups.
+
+### 2. Core Concepts & Mental Models
+
+We categorize mitigation into three stages relative to the model training pipeline:
+
+1. **Pre-processing (The Data):** Modifying the training space.
+   - _Technique:_ **Re-weighting**. Increasing the importance (loss penalty) of underrepresented groups or minority-positive examples.
+   - _Pros:_ Model-agnostic; Zero inference latency cost.
+
+2. **In-processing (The Algorithm):** Modifying the optimization.
+   - _Technique:_ **Adversarial Debiasing**. A "Generator" tries to predict the target, while a "Discriminator" tries to guess the protected attribute from the Generator's hidden state. The Generator is penalized if the Discriminator succeeds.
+   - _Pros:_ High effectiveness.
+   - _Cons:_ Hard to train (unstable); computationally expensive.
+
+3. **Post-processing (The Decision):** Modifying the output.
+   - _Technique:_ **Threshold Adjustment**. Using different decision thresholds for different groups (e.g., Score > 0.6 for Group A, > 0.5 for Group B).
+   - _Pros:_ Can force exact parity.
+   - _Cons:_ **Disparate Treatment**. Explicitly using race/gender at inference time is often illegal in lending/hiring (Civil Rights Act of 1964).
+
+**The "Scale" Mental Model**
+
+Imagine the loss function is a scale. The majority group puts a heavy weight on one side. Re-weighting adds a "thumb on the scale" for the minority group, ensuring the optimizer cares about them equally.
+
+### 3. Theoretical Foundations
+
+**Inverse Propensity Scoring (IPS) for Fairness**
+
+We calculate a weight `w(x)` for each sample `x` based on its group `g` and class label `y`.
+
+- **Logic:** If "Women who Default" are rare in the dataset, they get a _high_ weight. If "Men who Pay" are common, they get a _low_ weight.
+- **Result:** The "effective" dataset seen by the optimizer is balanced. The expected gradient update for Group A is equal to Group B.
+
+**The Accuracy-Fairness Trade-off**
+
+This is a Pareto frontier. By imposing a fairness constraint, you are restricting the solution space.
+
+- _Theorem:_ You generally _cannot_ improve fairness without sacrificing some aggregate accuracy (unless the original model was vastly underfitting).
+- _Goal:_ Minimal accuracy loss (e.g., -2%) for maximal fairness gain (e.g., +20% parity).
+
+### 4. Production-Grade Implementation
+
+We prioritize **Pre-processing (Re-weighting)** because it is the only method that:
+
+1. Requires **no changes** to the inference runtime (unlike Post-processing).
+2. Works with standard `fit()` APIs (XGBoost, Scikit-Learn, PyTorch).
+3. Is mathematically stable (unlike Adversarial training).
+
+**The Workflow:**
+
+1. **Audit:** Compute the base rates for all groups.
+2. **Compute Weights:** Generate a vector of sample weights.
+3. **Train:** Pass `sample_weight=weights` to the trainer.
+4. **Verify:** Check if the Fairness Metric (Day 54) improved.
+
+### 5. Hands-On Project / Exercise
+
+**Goal:** Retrain the biased Credit Default model from Day 54 using Re-weighting.
+
+**Constraint:** Reduce the FPR disparity to < 1.1 while keeping Global Accuracy > 90% of the baseline.
+
+#### Setup
+
+We reuse the "biased dataset" logic where Group B is noisier and underrepresented.
+
+```python
+# pip install fairlearn scikit-learn numpy pandas
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.utils.class_weight import compute_sample_weight
+from fairlearn.metrics import MetricFrame, false_positive_rate, accuracy_score
+
+# --- 1. Recreate Biased Data (Same as Day 54) ---
+np.random.seed(42)
+n_samples = 5000
+group = np.random.choice(['A', 'B'], size=n_samples, p=[0.8, 0.2])
+true_outcome = np.random.choice([0, 1], size=n_samples, p=[0.7, 0.3])
+
+credit_score = []
+for g, y in zip(group, true_outcome):
+    base = 700 if y == 0 else 500
+    noise = np.random.normal(0, 50 if g == 'A' else 150)  # B is noisier
+    credit_score.append(base + noise)
+
+df = pd.DataFrame({'credit_score': credit_score, 'group': group, 'target': true_outcome})
+
+X = df[['credit_score']]
+y = df['target']
+A = df['group']
+
+X_train, X_test, y_train, y_test, A_train, A_test = train_test_split(
+    X, y, A, test_size=0.3, random_state=42
+)
+
+# --- 2. Baseline Model (Unmitigated) ---
+model_base = RandomForestClassifier(n_estimators=50, random_state=42)
+model_base.fit(X_train, y_train)
+y_pred_base = model_base.predict(X_test)
+
+# --- 3. Mitigation: Sample Re-weighting ---
+# Balance the (Group x Target) cross-product so each combination
+# contributes equally to the optimizer's gradient updates.
+y_A_train_combined = [f"{y}_{a}" for y, a in zip(y_train, A_train)]
+sample_weights = compute_sample_weight('balanced', y_A_train_combined)
+
+model_mitigated = RandomForestClassifier(n_estimators=50, random_state=42)
+model_mitigated.fit(X_train, y_train, sample_weight=sample_weights)
+y_pred_mitigated = model_mitigated.predict(X_test)
+
+# --- 4. Comparison Report ---
+def print_report(name, y_pred):
+    metrics = MetricFrame(
+        metrics={
+            'accuracy': accuracy_score,
+            'fpr': false_positive_rate
+        },
+        y_true=y_test,
+        y_pred=y_pred,
+        sensitive_features=A_test
+    )
+
+    acc = metrics.overall['accuracy']
+    fpr_A = metrics.by_group['fpr']['A']
+    fpr_B = metrics.by_group['fpr']['B']
+    ratio = fpr_B / fpr_A if fpr_A > 0 else 0
+
+    print(f"[{name}]")
+    print(f"  Global Accuracy: {acc:.4f}")
+    print(f"  FPR (Group A):   {fpr_A:.4f}")
+    print(f"  FPR (Group B):   {fpr_B:.4f}")
+    print(f"  Disparity Ratio: {ratio:.2f}")
+    return acc, ratio
+
+print("\n--- MITIGATION RESULTS ---\n")
+base_acc, base_ratio = print_report("Baseline", y_pred_base)
+mit_acc, mit_ratio = print_report("Mitigated", y_pred_mitigated)
+
+# --- 5. Verification Constraints ---
+acc_retention = mit_acc / base_acc
+print(f"\nAccuracy Retention: {acc_retention:.2%}")
+
+if mit_ratio < 1.2 and acc_retention > 0.90:
+    print("[SUCCESS] Bias mitigated without catastrophic accuracy loss.")
+else:
+    print("[FAILURE] Trade-off constraints not met.")
+```
+
+#### Expected Outcome
+
+- **Baseline:** High accuracy (~0.90), but high disparity (Ratio ~1.5+). The model optimizes for Group A.
+- **Mitigated:** Slightly lower accuracy (~0.88), but significantly lower disparity (Ratio ~1.1).
+- **Why?** The weights forced the model to pay attention to the "noisy" Group B examples, likely widening the decision boundary to reduce False Positives for everyone, which slightly hurts Group A accuracy but protects Group B.
+
+### 6. Ethical, Security & Safety Considerations
+
+**The Legal Tightrope: Disparate Treatment vs. Impact**
+
+- **Disparate Treatment:** Using `Race` as an input feature during inference. (Generally Illegal).
+- **Disparate Impact:** Creating a neutral system that hurts a protected group. (Generally Illegal).
+- **Re-weighting Solution:** Re-weighting uses `Race` _only during training_ to ensure the _weights_ (parameters) are fair. During inference, the model does not know the user's race. This is generally the most legally defensible position for technical mitigation.
+
+**The "Masking" Danger**
+
+Re-weighting fixes the _model_, not the _world_. If Group B has lower credit scores because of systemic poverty, the model is now "grading on a curve." This is fair for the _algorithm_, but it introduces financial risk to the lender. This risk must be accepted by the business as the cost of compliance.
+
+### 7. Business & Strategic Implications
+
+1. **Metric Alignment:** Engineering teams optimize for `Loss` (MSE/LogLoss). Legal teams optimize for `Compliance`. Re-weighting aligns these by embedding compliance _into_ the loss function via weights.
+2. **Feature Investment:** If re-weighting drops accuracy too much, it signals that your features are weak for the minority group. The strategic fix is not "better algorithms," but "better data acquisition" for that segment.
+3. **A/B Testing:** Never roll out a mitigated model 100% immediately. A/B test to ensure the "Fairness" didn't introduce unexpected behavioral anomalies (e.g., massive increase in default rates).
+
+### 8. Common Pitfalls & Misconceptions
+
+- **Pitfall:** Re-weighting Outliers.
+  - _Correction:_ If you have one "Group B" example and you weight it 100x, the model will overfit to that single noise point. You must clip weights (e.g., max weight = 10) or ensure sufficient sample size.
+
+- **Pitfall:** Ignoring Intersectionality.
+  - _Correction:_ Weighting by `Race` and `Gender` separately is not enough. You must weight by the cross-product `Race_x_Gender` to protect "Black Women."
+
+- **Pitfall:** Applying Re-weighting to the Test Set.
+  - _Correction:_ Never re-weight the test set. You want to measure performance on the _real_ distribution, not the _balanced_ one.
+
+### 9. Prerequisites & Next Steps
+
+**Prerequisites:**
+
+- A calculated bias metric (from Day 54).
+- Access to training labels and protected attributes.
+
+**Next Steps:**
+
+1. **Tune:** Experiment with `sample_weight` intensity. You don't have to fully balance; you can half-balance to find a sweet spot.
+2. **Deploy:** Package the model. Note that no extra metadata is needed for inference.
+3. **Monitor:** Watch for "Drift." If the demographics of the live traffic change, your training weights might be outdated.
+
+A mitigated model with no documentation is still a compliance risk. The next step is to make the evidence of your work permanent and machine-verifiable. **Day 56: Automated Documentation: The Dynamic Model Card** turns the metrics and constraints from this exercise into a CI/CD-generated artifact that travels with every deployment.
+
+### 10. Further Reading & Resources
+
+- **Paper:** "A Reductions Approach to Fair Classification" (Agarwal et al., 2018).
+- **Library:** `sklearn.utils.class_weight` and `fairlearn.reductions`.
+- **Concept:** Visualizing how re-weighting shifts the decision boundary away from the minority group's cluster.
