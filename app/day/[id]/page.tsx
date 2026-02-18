@@ -15,7 +15,7 @@ import "katex/dist/katex.min.css";
 import CodeBlock from "../../components/CodeBlock";
 import { daysRegistry } from "../../../lib/days-registry";
 
-const BASE_URL = "https://veritas-sahilsatyams-projects.vercel.app";
+const BASE_URL = "https://veritas-one-theta.vercel.app";
 
 /**
  * Pre-render all known day pages at build time for better SEO crawlability.

@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { daysRegistry } from "../lib/days-registry";
 
-const BASE_URL = "https://veritas-sahilsatyams-projects.vercel.app";
+const BASE_URL = "https://veritas-one-theta.vercel.app";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();

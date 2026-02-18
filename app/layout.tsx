@@ -11,7 +11,7 @@ const inter = Inter({
 
 import { Analytics } from "@vercel/analytics/next";
 
-const BASE_URL = "https://veritas-sahilsatyams-projects.vercel.app";
+const BASE_URL = "https://veritas-one-theta.vercel.app";
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
