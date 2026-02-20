@@ -18,6 +18,14 @@ import { daysRegistry } from "../../../lib/days-registry";
 const BASE_URL = "https://veritas-one-theta.vercel.app";
 
 /**
+ * Force dynamic rendering so the unlock check uses the current date,
+ * not the build-time date. Without this, statically generated pages
+ * bake in the lock/unlock state at deploy time and never update.
+ */
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+/**
  * Pre-render all known day pages at build time for better SEO crawlability.
  */
 export async function generateStaticParams() {
