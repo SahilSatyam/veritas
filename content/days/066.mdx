@@ -1,0 +1,158 @@
+---
+day: "066"
+title: "Agentic Search: Look-Ahead Safety via Tree of Thoughts and MCTS"
+failure: "Linear Blindness"
+lens: "Safety"
+domain: "Agentic Systems"
+status: "published"
+tags:
+  ["Tree of Thoughts", "MCTS", "Planning", "Look-Ahead Safety", "World Models"]
+date: "2026-03-08"
+---
+
+### Abstract
+
+Agents locked into linear, autoregressive generation suffer from "Linear Blindness." They greedily select the most plausible immediate next step, only to realize multiple turns later that they have painted themselves into a corner. When dealing with mutative, real-world actions, backtracking is not an algorithmic luxury; it requires dangerous and complex state rollbacks. To engineer production-grade autonomy, we must decouple _planning_ from _execution_. By implementing Tree of Thoughts (ToT) and Monte Carlo Tree Search (MCTS) over a simulated "World Model," agents can explore, evaluate, and prune potential execution paths in imagination, fundamentally trading inference compute for look-ahead safety and robust task completion.
+
+---
+
+### 1. Why This Topic Matters
+
+The standard ReAct (Reason-Act) loop is fundamentally a System 1 process: it is reactive and linear. If you ask a ReAct agent to orchestrate a complex cloud migration, it might take the first logical step (e.g., "Shut down the secondary database to snapshot it"). Five steps later, it realizes it needed that secondary database to verify the checksums of the primary.
+
+Because the agent has already executed the action in reality, it cannot simply "undo" the token generation. The system is now in a degraded, potentially unrecoverable state. Linear planning forces the agent to commit to a trajectory before it understands the consequences. We must upgrade agents to System 2 thinking: simulating futures, scoring them, and choosing the optimal path _before_ a single side-effect occurs.
+
+### 2. Core Concepts & Mental Models
+
+To break out of linear blindness, we introduce **Agentic Search**.
+
+- **Tree of Thoughts (ToT):** Instead of generating one thought, the model is prompted to explicitly generate $k$ distinct possible next steps (branches).
+- **The Value Function:** An independent evaluation mechanism (often the LLM itself prompted as a critic) that scores each proposed thought based on its likelihood of reaching the final goal.
+- **Monte Carlo Tree Search (MCTS):** A more advanced algorithm borrowed from AlphaGo. It balances _exploration_ (trying new, unproven branches) with _exploitation_ (drilling deeper into high-scoring branches) by simulating paths to the end.
+- **World Models:** A sandbox—either a literal ephemeral container or an LLM-simulated environment—where the agent can test "what if I do this?" without impacting production state.
+
+### 3. Theoretical Foundations
+
+At the token level, an LLM selects the next word based on a probability distribution. In agentic workflows, we elevate this selection mechanism to the _semantic_ level.
+
+Let $S$ be the current state of the environment. Instead of executing an action $a$ immediately, we generate a set of candidate actions $A = \{a_1, a_2, ..., a_k\}$.
+We then require a Value Function $V(s, a)$ to estimate the expected reward of taking action $a$ in state $s$. In ToT, we prompt the model to classify states into categories (e.g., "sure", "maybe", "impossible") or numerical scores, and we aggressively prune the tree, discarding branches where $V(s, a)$ falls below a safety or viability threshold.
+
+### 4. Production-Grade Implementation
+
+**Resolving the Trade-off: Inference Cost vs. Success Rate**
+Tree of Thoughts is computationally violent. If you generate 3 thoughts per step, and search depth is 5 steps, you are evaluating $3^5 = 243$ trajectories. You are multiplying your API costs and latency by two or three orders of magnitude.
+
+_The Resolution:_ You do not use MCTS or ToT for routing customer support tickets. You use it exclusively for high-stakes, high-complexity tasks where the cost of failure astronomically outweighs the cost of compute. We explicitly trade massive inference cost for a near-guaranteed success rate. In production, wrap this in a strict token budget limiter to prevent infinite tree expansion.
+
+### 5. Hands-On Project / Exercise
+
+**Constraint:** Build a "Game of 24" reasoning node. Given 4 numbers (e.g., 4, 9, 10, 13), the goal is to reach 24 using basic arithmetic.
+A linear agent will often guess a first step (e.g., "13 - 10 = 3") and get stuck. You will implement a ToT node that explicitly generates 3 potential first steps, passes them to a Value Function, scores them, and discards the low-scoring paths before committing.
+
+_(See Section 8 for the implementation)._
+
+### 6. Ethical, Security & Safety Considerations
+
+**Look-Ahead Safety**
+The most profound benefit of Tree of Thoughts is not capability; it is safety. By simulating actions in a World Model before execution, we introduce **Look-Ahead Safety**.
+
+Imagine an agent tasked with optimizing a server. It generates three potential branches.
+
+- Branch A: Compress log files.
+- Branch B: Delete `/var/log` to free up 50GB.
+- Branch C: Archive logs to S3.
+
+During the Value Function evaluation phase, the Critic model evaluates Branch B. Because it is evaluating the _simulated_ outcome, the Critic recognizes that deleting `/var/log` violates the system's compliance guardrails. Branch B is pruned in imagination. It is never sent to the execution engine. This acts as a mathematical, pre-emptive Authorization Gate.
+
+### 7. Business & Strategic Implications
+
+We are transitioning from "Training Compute" to "Inference Compute." Historically, the only way to make a model smarter was to train a larger foundation model. Tree of Thoughts proves that you can dramatically increase the effective intelligence and reliability of an _existing_ model simply by giving it more time and compute to "think" during inference.
+
+For technical executives, this dictates a shift in unit economics: budget for "Test-Time Compute." You can achieve GPT-5 level reasoning on GPT-4 class models by wrapping them in robust MCTS scaffolding.
+
+### 8. Code Examples / Pseudocode
+
+This implementation demonstrates a single ToT expansion and evaluation step for the Game of 24, effectively pruning dead ends.
+
+```python
+import re
+
+# Dummy LLM client. In production, this calls your inference API.
+class LLMClient:
+    def generate(self, prompt: str) -> str:
+        # Mock behavior for demonstration of the ToT logic
+        if "Propose 3 distinct next mathematical steps" in prompt:
+            return "1. 10 - 4 = 6\\n2. 13 - 10 = 3\\n3. 13 + 10 = 23"
+        if "Evaluate this step" in prompt:
+            if "10 - 4 = 6" in prompt:
+                return "Score: 9. (Remaining: 6, 9, 13. 13-9=4, 4*6=24. This is a SURE path)."
+            if "13 - 10 = 3" in prompt:
+                return "Score: 2. (Remaining: 3, 4, 9. Difficult to reach 24. IMPOSSIBLE)."
+            if "13 + 10 = 23" in prompt:
+                return "Score: 5. (Remaining: 23, 4, 9. Unlikely. MAYBE)."
+        return ""
+
+def generate_thoughts(state: str, llm: LLMClient) -> list[str]:
+    prompt = f"Given the numbers {state}. Propose 3 distinct next mathematical steps using 2 numbers."
+    response = llm.generate(prompt)
+    # Parse the numbered list
+    return [line.split(". ")[1].strip() for line in response.split("\\n") if ". " in line]
+
+def evaluate_thought(state: str, thought: str, llm: LLMClient) -> int:
+    prompt = f"Given {state}, if we do '{thought}', evaluate the likelihood of reaching 24. Return a 'Score: X' from 1 to 10."
+    response = llm.generate(prompt)
+
+    # Extract the numerical score
+    match = re.search(r"Score:\s*(\d+)", response)
+    if match:
+        return int(match.group(1))
+    return 1 # Default to lowest score if parsing fails
+
+def tot_step(current_state: str):
+    llm = LLMClient()
+    print(f"[System] Current State: {current_state}")
+
+    # 1. Expansion Phase
+    thoughts = generate_thoughts(current_state, llm)
+    print(f"[System] Generated 3 Potential Paths: {thoughts}")
+
+    # 2. Evaluation Phase
+    scored_thoughts = []
+    for thought in thoughts:
+        score = evaluate_thought(current_state, thought, llm)
+        scored_thoughts.append({"thought": thought, "score": score})
+        print(f"  -> Evaluated '{thought}': Score {score}/10")
+
+    # 3. Pruning / Selection Phase
+    # Sort descending by score
+    scored_thoughts.sort(key=lambda x: x["score"], reverse=True)
+
+    best_step = scored_thoughts[0]
+    print(f"\\n[System] Committing to best step: '{best_step['thought']}' (Discarded lower-scoring branches).")
+    return best_step
+
+# --- Execution ---
+# Current numbers: 4, 9, 10, 13
+# tot_step("4, 9, 10, 13")
+
+```
+
+### 9. Common Pitfalls & Misconceptions
+
+- **Misconception:** "I can just ask the model to 'think step by step' (Chain of Thought)." Chain of Thought is still a single, linear trajectory. If step 2 is wrong, step 3 through 10 will confidently build on that error. ToT explicitly forces branching and backtracking.
+- **Pitfall:** Weak Critic Models. If the model you use for the Value Function (evaluation) is too small or prone to hallucination, it will assign high scores to impossible paths, causing the search tree to devolve into a random walk. The Critic must often be a more capable model than the Generator.
+- **Pitfall:** Infinite Depth. MCTS without strict depth limits and token budgets will bankrupt your API accounts in minutes. Always implement a hard `max_expansions` counter.
+
+### 10. Prerequisites & Next Steps
+
+- **Prerequisites:** Mastery of the ReAct pattern (Day 61) and programmatic prompt parsing (Day 62).
+- **Next Steps:** Upgrading the World Model. Moving from a mathematical game to code generation, where the "Value Function" is not an LLM critic, but an actual sandboxed Python runtime (Day 64) that runs unit tests on the generated branch to calculate a deterministic score.
+- **Day 67:** Multi-Agent Handoffs: Engineering the Router Pattern.
+
+### 11. Further Reading & Resources
+
+- Yao, S., et al. (2023). _"Tree of Thoughts: Deliberate Problem Solving with Large Language Models"_. Princeton University / Google DeepMind.
+- Silver, D., et al. (2016). _"Mastering the game of Go with deep neural networks and tree search"_. Nature. (For understanding MCTS fundamentals).
+
+---
