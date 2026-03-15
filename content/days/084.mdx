@@ -1,0 +1,132 @@
+---
+day: "084"
+title: "Engineering for High-Stakes: Medical & Legal Domains"
+failure: "The Malpractice Lawsuit"
+lens: "Ethics"
+domain: "High-Stakes AI"
+status: "published"
+tags: ["Epistemic Uncertainty", "HITL", "Medical AI", "Compliance"]
+date: "2026-03-18"
+---
+
+### Abstract
+
+Applying the consumer web ethos of "Move Fast and Break Things" to high-stakes domains is not just irresponsible; it is professional negligence. When a production system operates in healthcare or law, "breaking things" translates directly to misdiagnosis, legal malpractice, regulatory sanctions, and loss of life. Systems in these environments must be engineered around safety, epistemic humility, and deterministic fallback mechanisms. This post defines the architecture for deploying AI in critical domains, focusing on quantifying uncertainty, enforcing human-in-the-loop (HITL) boundaries, and strictly prioritizing the ethical mandate to "Do No Harm" over completing a prompt.
+
+### 1. Why This Topic Matters
+
+The primary production failure this architecture prevents is **"The Malpractice Lawsuit."** Software engineers transitioning into AI often view hallucination as a data quality issue to be patched with better retrieval. In medical and legal tech, hallucination is a catastrophic liability event. If a customer service bot hallucinates a refund policy, the company loses $50. If a medical triage bot hallucinates a benign diagnosis for early-stage stroke symptoms, the patient dies, and the organization is destroyed by litigation.
+
+Engineering for high-stakes domains requires a fundamental paradigm shift: _Refusal to generate an answer is a successful system state._ We must architect systems that prioritize identifying when they are out of bounds over guessing a plausible-sounding response.
+
+### 2. Core Concepts & Mental Models
+
+- **Epistemic Uncertainty:** The model's "awareness" of what it does not know. Differentiating between a confident correct answer, a confident hallucination (aleatoric uncertainty), and a lack of underlying knowledge (epistemic uncertainty).
+- **Retrieval-Interleaved Generation (RIG):** Unlike standard RAG (which retrieves context once at the beginning), RIG pauses generation at the sentence level to retrieve, verify, and cite authoritative sources (e.g., FDA guidelines, case law) before emitting the next claim.
+- **Human-in-the-Loop (HITL) as a Legal Boundary:** In regulated software, HITL is not a UX feature for gathering training data; it is a hard legal requirement. The system must be designed to act solely as an analytical subordinate to a licensed human professional.
+
+### 3. Theoretical Foundations (Only What’s Needed)
+
+To prevent a model from guessing in high-stakes scenarios, we must quantify its confidence mathematically. The most accessible measure of an LLM's uncertainty is its **Predictive Entropy** over the output token distribution.
+
+For a generated sequence $Y$ given input $X$ , the predictive entropy measures the "flatness" of the probability distribution for the next token:
+
+$$H(Y|x) = -\sum_{y \in \mathcal{Y}} P(y|x) \log P(y|x)$$
+
+If the model is highly confident (e.g., reciting a well-known legal statute), the probability mass is concentrated on one token, and entropy approaches zero. If the model is guessing (e.g., inventing a diagnosis), the probability mass is spread across many plausible tokens, resulting in high entropy. Production systems in medical domains use entropy thresholds to trigger automatic "I don't know" circuit breakers.
+
+### 4. Production-Grade Implementation
+
+**Explicit Trade-off Resolution: Recall vs. Precision in Diagnostics**
+_The Conflict:_ In medical AI, if you optimize for High Recall, the model lists every possible catastrophic illness that matches a symptom (e.g., a headache might be a brain tumor), severely frightening the patient and overloading doctors with false positives. If you optimize for High Precision, the model only lists the most likely benign causes, risking missing a rare, fatal condition.
+_The Resolution:_ We resolve this by entirely removing the model's mandate to diagnose. The AI's objective function is shifted from _Diagnostic Generation_ to _Symptom Extraction_. We optimize for 100% recall on extracting structured symptoms from the user's unstructured text, and 0% on generating a diagnostic conclusion. The output is a structured dossier for the human doctor, fundamentally sidestepping the recall/precision trap in diagnosis.
+
+### 5. Hands-On Project / Exercise
+
+**Constraint:** Build a "Medical Triage Bot" that strictly refuses to diagnose, summarizes symptoms into a structured JSON, and triggers a deterministic "Refer to Doctor" escalation if high-risk keywords are detected.
+
+1. **The Deterministic Override:** Create a strict, hardcoded list of high-risk heuristics (e.g., "chest pain", "shortness of breath", "numbness", "suicide").
+2. **The Routing Layer:** Before the LLM processes the user's input, run a regex/keyword scan. If a high-risk term is found, bypass the LLM entirely and immediately return a hardcoded emergency escalation protocol.
+3. **The Extraction Prompt:** If the input is low-risk, pass it to the LLM with a highly constrained system prompt: _"You are a data extraction tool. You may not offer medical advice, diagnoses, or reassurance. Extract the user's symptoms into the defined JSON schema."_
+4. **Audit & Verification:** Run a test suite of 100 inputs (50 benign, 50 containing emergency markers). _Success criteria:_ 100% of emergency inputs must trigger the hardcoded override without generating LLM text. 100% of benign inputs must result in a structured summary with exactly zero diagnostic labels.
+
+### 6. Ethical, Security & Safety Considerations
+
+**Lens Applied: Ethics ("Do No Harm")**
+
+In high-stakes AI, the Hippocratic Oath ("First, do no harm") translates to system architecture. Relying on an LLM to self-censor via prompt engineering (e.g., "Do not give medical advice") is ethically and technically indefensible. LLMs are compliance-agnostic text predictors; they can be easily jailbroken by roleplay or hypothetical phrasing ("My character in a novel has chest pain...").
+
+Safety must be engineered outside the model. The deterministic routing layer ensures that critical safety boundaries are enforced by robust, interpretable code, not by the probabilistic whims of a neural network. Furthermore, systems must combat **Automation Bias**—the tendency for junior legal or medical staff to blindly trust the machine's output. UI designs must actively surface the AI's uncertainty and mandate human sign-off checkboxes for every critical insight.
+
+### 7. Business & Strategic Implications
+
+Deploying AI in healthcare or law dramatically alters your risk profile and regulatory obligations. If your software makes a diagnostic decision, it may be classified by the FDA as **Software as a Medical Device (SaMD)**, triggering rigorous clinical evaluation, quality management system (QMS) requirements, and ISO 13485 compliance.
+
+Strategically, positioning your AI as an "administrative summarization tool" rather than a "diagnostic assistant" is not just a marketing decision; it is a fundamental legal firewall. By constraining the AI to purely administrative and structuring tasks, you reduce insurance premiums, limit liability, and dramatically accelerate your time-to-market by avoiding the heaviest regulatory burdens.
+
+### 8. Code Examples / Pseudocode
+
+```python
+import re
+import json
+
+# 1. Deterministic Safety Layer (Runs BEFORE the LLM)
+HIGH_RISK_PATTERNS = [
+    r"\b(chest\s*pain)\b",
+    r"\b(short(ness)?\s*of\s*breath)\b",
+    r"\b(numbness)\b",
+    r"\b(suicid\w*)\b"
+]
+
+def check_emergency_heuristics(user_input: str) -> bool:
+    for pattern in HIGH_RISK_PATTERNS:
+        if re.search(pattern, user_input, re.IGNORECASE):
+            return True
+    return False
+
+def process_triage(user_input: str) -> str:
+    # 2. Hard Circuit Breaker
+    if check_emergency_heuristics(user_input):
+        # Audit Log: Log the exact heuristic that triggered the override
+        log_security_event(action="emergency_override_triggered", text=user_input)
+        return json.dumps({
+            "status": "EMERGENCY_ESCALATION",
+            "message": "Please seek immediate medical attention or call emergency services.",
+            "extracted_symptoms": None
+        })
+
+    # 3. Safe Extraction via constrained LLM call (using FSM/Structured Generation)
+    # The LLM is strictly prompted to only populate a symptom schema.
+    try:
+        structured_summary = llm_client.extract_symptoms(user_input)
+        return json.dumps({
+            "status": "SUMMARY_COMPLETE",
+            "message": "Symptoms recorded for physician review.",
+            "extracted_symptoms": structured_summary
+        })
+    except GenerationError:
+        # Fallback to safe refusal
+        return json.dumps({
+            "status": "ERROR",
+            "message": "Unable to process request. Please consult a doctor."
+        })
+
+```
+
+### 9. Common Pitfalls & Misconceptions
+
+- **Misconception:** Adding a UI disclaimer ("This is an AI, not a doctor") protects you from liability.
+  **Reality:** Disclaimers do not absolve you of negligence if your system's core design actively provides dangerous diagnostic advice. Regulators look at system behavior, not just user agreements.
+- **Pitfall: Model "Helpfulness" Overriding Instructions.** Base models are heavily fine-tuned via RLHF to be "helpful." In a medical context, "helpful" often manifests as the model desperately trying to provide a cure or a diagnosis despite system prompts telling it not to.
+- **Pitfall: Treating RAG as Ground Truth.** Retrieving a legitimate medical document does not guarantee the LLM will synthesize it correctly. It may combine two true facts to create a lethal hallucination.
+
+### 10. Prerequisites & Next Steps
+
+**Prerequisites:** Deep understanding of regulatory frameworks (HIPAA/GDPR/FDA SaMD), logging and auditability standards, and deterministic system design.
+**Next Steps:** In Day 85, we will explore "The Co-Pilot UX Pattern: Engineering Human Agency," shifting the focus from mathematical back-ends to human-in-the-loop front-ends that empower rather than automate the user.
+
+### 11. Further Reading & Resources
+
+- _Software as a Medical Device (SaMD): Clinical Evaluation_ (FDA / IMDRF Guidelines).
+- _A Gentle Introduction to Conformal Prediction and Distribution-Free Uncertainty Quantification_ (Angelopoulos & Bates).
+- _Automation Bias in Healthcare AI_ (Literature on human-computer interaction in medicine).

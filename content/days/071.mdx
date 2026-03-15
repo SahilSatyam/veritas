@@ -1,0 +1,140 @@
+---
+day: "071"
+title: "Multi-Agent Orchestration: Graph-Based Control"
+failure: "The Infinite Loop (Cyclic Dependency)"
+lens: "Safety"
+domain: "LLM Orchestration"
+status: "published"
+tags:
+  ["Multi-Agent", "LangGraph", "State Machines", "Safety", "Bounded Recursion"]
+date: "2026-03-03"
+---
+
+### Abstract
+
+The transition from single-prompt interactions to multi-agent systems introduces a critical failure mode: the infinite loop. When agents are allowed to independently delegate tasks, request revisions, and self-correct without structural limits, systems degrade into unresolvable cyclic dependencies—consuming compute, breaching SLAs, and failing to return control to the user. This document establishes graph-based orchestration as the mandatory architectural pattern for production multi-agent systems, strictly prioritizing deterministic state machine control over unconstrained agentic flexibility.
+
+### 1. Why This Topic Matters
+
+In prototype environments, "autonomous agents" that converse until they reach a consensus are an impressive demonstration of emergent behavior. In production, they are a liability.
+
+The primary production failure prevented today is **The Infinite Loop**—a scenario where a cyclic dependency emerges between agents (e.g., a Coder agent generates code, a Reviewer agent rejects it, the Coder generates the exact same code, the Reviewer rejects it again). Left unchecked, this results in a "Denial of Wallet" via token exhaustion, complete violation of system availability, and catastrophic loss of user trust. Engineering leadership cannot sign off on architectures where halting is contingent on the non-deterministic output of a probabilistic model. We must engineer systems that are guaranteed to halt.
+
+### 2. Core Concepts & Mental Models
+
+To safely deploy multi-agent systems, we must discard the mental model of a "chat room" and adopt the mental model of a **Finite State Machine (FSM)**.
+
+- **Agents are Nodes, Not Orchestrators:** An LLM should never dictate system flow. It simply performs work within a node, modifying a shared state object.
+- **Edges are Deterministic (Mostly):** Transitions between nodes are governed by code, not prompts. While an LLM can classify a state (e.g., "Pass" or "Fail"), the _routing_ based on that classification is hardcoded.
+- **State is Global and Immutable per Step:** The system maintains a shared graph state (e.g., a dictionary of messages, error counts, and metadata). Each node receives the current state, executes its logic, and returns state updates.
+
+### 3. Theoretical Foundations (Only What’s Needed)
+
+Multi-agent orchestration requires formalizing the workflow as a Directed Acyclic Graph (DAG) or a constrained cyclic graph.
+
+We model the agentic workflow as a Finite State Automaton. Let $S$ be the finite set of system states, and $\Sigma$ the alphabet of possible agent outputs (e.g., {Approved, Rejected}). The transition function is $\delta: S \times \Sigma \rightarrow S$.
+
+To ensure safety in a system allowing cyclic transitions (revisions), we must introduce a constraint vector into the state, notably a turn counter $k$. We define a mandatory terminal state $S_{terminal}$. The system is only production-ready if we can formally guarantee halting:
+
+$$\lim_{t \to k_{max}} S_t = S_{terminal}$$
+
+If the transition function relies solely on the LLM's semantic output (e.g., `if Reviewer says "Looks good"`), the halting problem is unsolvable. By enforcing $k_{max}$ outside the model's control, we guarantee $O(1)$ upper-bound complexity on execution time.
+
+### 4. Production-Grade Implementation
+
+Modern orchestration frameworks like LangGraph and AutoGen have converged on graph-based state management. A production-grade implementation requires three components:
+
+1. **Strict State Schema:** A typed object defining exactly what data moves between agents. Crucially, this schema must include execution metadata (e.g., `revision_count: int`).
+2. **Stateless Nodes:** Agents do not remember the conversation. They are pure functions that take the current `State` as input, invoke an LLM, and return a `StateUpdate`.
+3. **Conditional Edges with Hard Limits:** Routing logic that evaluates the `State`. The edge logic must always contain a short-circuit condition evaluating `revision_count >= MAX_REVISIONS`.
+
+### 5. Hands-On Project / Exercise
+
+**Constraint:** Build a cyclic graph where a "Researcher" and a "Reviewer" iterate on a draft. To demonstrate responsible design, the loop must forcefully exit after exactly 3 iterations, regardless of the Reviewer's assessment, preventing an infinite quality-check loop.
+
+**Architecture:**
+
+- **Node A (Researcher):** Drafts content based on constraints. Increments `revision_count`.
+- **Node B (Reviewer):** Critiques the draft. Outputs `status` ("APPROVED" or "REJECTED") and `feedback`.
+- **Conditional Edge:** Reads `status` and `revision_count`.
+- If `status == "APPROVED"`, route to `END`.
+- If `status == "REJECTED"` AND `revision_count < 3`, route to `Researcher`.
+- If `status == "REJECTED"` AND `revision_count >= 3`, route to `Forced_Output_Formatter` (escalates to human or flags as partial).
+
+### 6. Ethical, Security & Safety Considerations
+
+**Safety Lens: Bounded Recursion.**
+From a security perspective, unconstrained multi-agent loops open the door to adversarial manipulation. A malicious user prompt could deliberately inject contradictory constraints designed to keep the agents debating indefinitely, consuming expensive API quotas (resource exhaustion attacks). Implementing strict, non-bypassable state-machine limits is a non-negotiable security control.
+
+Furthermore, from an auditability standpoint, if an AI system generates harmful or erroneous output, investigators must be able to trace exactly _which_ agent made the error and _why_ the system routed to that state. Graph execution logs provide a cryptographic-like ledger of system decisions.
+
+### 7. Business & Strategic Implications
+
+**Trade-off Resolution: Flexibility vs. Determinism**
+The central tension in multi-agent systems is balancing the generative flexibility of LLMs with the deterministic reliability required by enterprise systems.
+
+_We explicitly resolve this trade-off by subordinating flexibility to determinism._ We encapsulate flexibility _within_ the nodes (allowing the LLM to dynamically generate text, write code, or query tools), but we enforce strict determinism _between_ the nodes. Business stakeholders require SLAs, predictable costs, and compliance. An architecture that prioritizes "agent autonomy" over predictable graph execution cannot guarantee any of these. In production, control is more valuable than autonomy.
+
+### 8. Code Examples / Pseudocode
+
+```python
+from typing import TypedDict, Annotated, Sequence
+import operator
+
+# 1. Define the strictly typed state
+class GraphState(TypedDict):
+    messages: Annotated[Sequence[str], operator.add]
+    draft: str
+    feedback: str
+    revision_count: int
+    status: str
+
+# 2. Define the conditional edge logic (Deterministic Routing)
+def router(state: GraphState) -> str:
+    # SAFETY: The hard boundary is evaluated first.
+    if state["revision_count"] >= 3:
+        # Failsafe path: prevent infinite loop
+        return "human_escalation"
+
+    if state["status"] == "APPROVED":
+        return "end"
+
+    return "researcher"
+
+# 3. Node implementations (Flexibility contained here)
+def researcher_node(state: GraphState) -> dict:
+    # LLM call omitted for brevity
+    new_draft = invoke_llm_researcher(state["draft"], state["feedback"])
+    return {
+        "draft": new_draft,
+        "revision_count": state["revision_count"] + 1 # State mutation
+    }
+
+def reviewer_node(state: GraphState) -> dict:
+    # LLM call omitted for brevity
+    status, feedback = invoke_llm_reviewer(state["draft"])
+    return {"status": status, "feedback": feedback}
+
+# System orchestration (Conceptual LangGraph setup)
+# graph.add_node("researcher", researcher_node)
+# graph.add_node("reviewer", reviewer_node)
+# graph.add_conditional_edges("reviewer", router)
+
+```
+
+### 9. Common Pitfalls & Misconceptions
+
+- **Misconception:** Giving an agent a "Stop" tool is sufficient for flow control.
+- **Reality:** The agent might hallucinate or simply choose not to use the tool if the prompt pushes it to achieve an impossible standard. Halting must be managed by the graph infrastructure, not the prompt.
+- **Pitfall:** Passing raw message arrays without explicit state variables (like `revision_count`). This forces the orchestration logic to parse natural language to determine routing, re-introducing fragility.
+
+### 10. Prerequisites & Next Steps
+
+- **Prerequisites:** Mastery of Structured Outputs (Day 15) to ensure the Reviewer node consistently returns a parseable `APPROVED/REJECTED` schema, and Tool Calling (Day 22).
+- **Next Steps:** In Day 72, we will cover "Human-in-the-Loop as a Graph Node," exploring how to pause graph execution, await asynchronous human approval, and resume state gracefully.
+
+### 11. Further Reading & Resources
+
+- LangGraph Documentation: Multi-Agent Workflows
+- ISO/IEC 23894:2023 - Information technology — Artificial intelligence — Risk management.
+- _Agentic Design Patterns_ (Stanford AI Lab publications on deterministic control of probabilistic systems).

@@ -1,0 +1,149 @@
+---
+day: "074"
+title: "Knowledge Graphs for RAG: GraphRAG"
+failure: "The Connecting-the-Dots Failure"
+lens: "Ethics"
+domain: "RAG & Data Retrieval"
+status: "published"
+tags:
+  [
+    "GraphRAG",
+    "Knowledge Graphs",
+    "Entity Extraction",
+    "Multi-hop Retrieval",
+    "Ethics",
+  ]
+date: "2026-03-06"
+---
+
+### Abstract
+
+Standard retrieval-augmented generation (RAG) relies on dense vector embeddings to find semantically similar text. However, vector search fundamentally lacks topological awareness; it cannot reliably synthesize relationships distributed across disjointed documents. This document mandates the integration of Knowledge Graphs (GraphRAG) for multi-hop reasoning systems. By extracting entities and their relationships into a structured graph database, we enable deterministic, explainable traversal of complex networks. Furthermore, we address the critical ethical mandate of auditing these auto-generated graphs to prevent structural bias and algorithmic redlining.
+
+### 1. Why This Topic Matters
+
+The primary production failure we prevent today is **The Connecting-the-Dots Failure**.
+
+Consider a financial compliance system analyzing news feeds. Document A states "Alex serves on the board of Apex Corp." Document B states "Apex Corp transferred funds to Nexus Ltd." A user asks: "Is Alex connected to Nexus Ltd?" Standard vector RAG fails here. The query has low semantic similarity to either document individually, and neither chunk contains the full answer. The RAG system returns an empty or hallucinated response.
+
+In enterprise contexts—fraud detection, legal discovery, intelligence analysis—relationships are as important as the data itself. Engineering leadership cannot deploy systems that fail at basic transitive reasoning. We must transition from purely semantic retrieval to topological retrieval.
+
+### 2. Core Concepts & Mental Models
+
+To master GraphRAG, engineers must shift their mental model from "documents in a vector space" to "networks of facts."
+
+- **Vector RAG = Semantic Similarity:** "Find me paragraphs that sound like my question."
+- **GraphRAG = Topological Traversal:** "Find me the explicit network path between these two concepts."
+- **Knowledge Triples:** The atomic unit of a graph, defined as `(Subject, Predicate, Object)`. For example, `(Alex, BOARD_MEMBER_OF, Apex Corp)`.
+- **Entity Resolution:** The critical, often-overlooked process of recognizing that "Alex", "Alexander", and "Mr. A" refer to the same node in the graph.
+
+### 3. Theoretical Foundations (Only What’s Needed)
+
+A Knowledge Graph is a directed, labeled multi-graph, defined formally as $G = (V, E)$, where $V$ is a set of vertices (entities) and $E$ is a set of edges (relationships).
+
+In traditional RAG, retrieval is a nearest-neighbor search in a high-dimensional continuous space $\mathbb{R}^d$. In GraphRAG, retrieval is a pathfinding algorithm (e.g., Dijkstra's or Breadth-First Search) across a discrete mathematical structure.
+
+To answer a multi-hop query between entity $v_1$ and $v_k$, the system must compute a path $P = (v_1, e_1, v_2, e_2, ..., v_k)$ such that the concatenated predicates $\{e_1, e_2, ...\}$ satisfy the semantic constraint of the user's query. The LLM's role shifts from _guessing_ the connection based on loose context to _summarizing_ the mathematically proven path.
+
+### 4. Production-Grade Implementation
+
+A production GraphRAG pipeline consists of three distinct phases:
+
+1. **The Ingestion & Extraction Pipeline:** Raw text is passed through an LLM (or a specialized NLP model like SpaCy/GLiNER) explicitly prompted to extract triples according to a strict ontology (e.g., standardizing predicates to `OWNED_BY`, `LOCATED_IN`, `WORKS_FOR`).
+2. **The Graph Database:** Triples are loaded into a graph database (e.g., Neo4j, Amazon Neptune, or Memgraph) that supports graph traversal languages like Cypher or Gremlin.
+3. **The Retrieval Orchestrator:** When a user queries the system, an LLM extracts the target entities from the query, executes a graph traversal query to find subgraphs or paths connecting those entities, and passes the resulting network topology back to the LLM for final synthesis.
+
+### 5. Hands-On Project / Exercise
+
+**Constraint:** Build a mini GraphRAG pipeline that extracts entities from news articles, links them, and answers a multi-hop question that vector search misses.
+
+**Architecture:**
+We will use Python with `NetworkX` for in-memory graph representation.
+
+1. **Input:** "Alice became the CEO of Globex in 2024." and "Globex recently acquired Initech."
+2. **Extraction:** An LLM extracts `(Alice, CEO_OF, Globex)` and `(Globex, ACQUIRED, Initech)`.
+3. **Graph Construction:** We add these as nodes and directed edges in `NetworkX`.
+4. **Query:** "How is Alice related to Initech?"
+5. **Traversal:** We use `nx.shortest_path(G, source="Alice", target="Initech")`. The system returns the explicit path `Alice -> Globex -> Initech`. We pass this path to the LLM to generate the final response: "Alice is the CEO of Globex, which recently acquired Initech."
+
+### 6. Ethical, Security & Safety Considerations
+
+**Ethics Lens: Structural Bias and Algorithmic Redlining.**
+Knowledge graphs are not inherently objective. They inherit the biases of both the source data and the LLM used for extraction.
+
+If an LLM has latent biases, its entity extraction phase might disproportionately link certain demographic names or geographic regions to negative predicates (e.g., `SUSPECTED_OF`, `HIGH_RISK_NODE`). Over time, this creates a structurally biased topology. When a downstream RAG system traverses this graph, it will confidently output discriminatory analysis backed by "hard data."
+
+Engineering responsibility requires continuous auditing of the graph structure. You must compute graph centrality metrics (e.g., PageRank, Betweenness Centrality) segmented by protected classes to detect if the graph is topologically isolating or unfairly clustering specific groups. You cannot defend an algorithmic decision to a regulator if the underlying data structure is mathematically biased.
+
+### 7. Business & Strategic Implications
+
+**Trade-off Resolution: Ingestion Cost vs. Retrieval Richness**
+The primary barrier to GraphRAG adoption is unit economics. Extracting dense vector embeddings is cheap and fast (milliseconds per document). Prompting an LLM to extract highly accurate knowledge triples from every single sentence is computationally expensive, slow, and API-intensive.
+
+_We explicitly resolve this trade-off via Tiered Hybrid Architecture._ You do not process your entire data lake into a Knowledge Graph. You use vector RAG (inexpensive) for general unstructured documents (manuals, transcripts, policies). You reserve GraphRAG (expensive ingestion) strictly for high-value, highly-relational datasets—such as transaction logs, CRM data, and compliance reports. By layering vector search over the graph (using vector embeddings _on_ the graph nodes), you achieve the semantic flexibility of RAG with the structural precision of a graph, without bankrupting your compute budget.
+
+### 8. Code Examples / Pseudocode
+
+```python
+import networkx as nx
+import json
+
+# 1. Synthesize the Extraction Phase (Normally done via LLM Structured Output)
+extracted_triples = [
+    {"subject": "Alice", "predicate": "CEO_OF", "object": "Globex"},
+    {"subject": "Globex", "predicate": "ACQUIRED", "object": "Initech"}
+]
+
+# 2. Build the Knowledge Graph
+G = nx.DiGraph()
+for triple in extracted_triples:
+    G.add_node(triple["subject"])
+    G.add_node(triple["object"])
+    G.add_edge(triple["subject"], triple["object"], relation=triple["predicate"])
+
+# 3. The Multi-Hop Retrieval Mechanism
+def query_graph_rag(source_entity: str, target_entity: str) -> str:
+    try:
+        # Find the topological path connecting the entities
+        path = nx.shortest_path(G, source=source_entity, target=target_entity)
+
+        # Reconstruct the context from the edges
+        context_statements = []
+        for i in range(len(path) - 1):
+            subj = path[i]
+            obj = path[i+1]
+            relation = G[subj][obj]['relation']
+            context_statements.append(f"{subj} {relation} {obj}")
+
+        context_str = ". ".join(context_statements)
+
+        # 4. Final LLM Synthesis (Pseudocode)
+        prompt = f"Using this verified data network: '{context_str}', answer how {source_entity} and {target_entity} are connected."
+        # return llm.generate(prompt)
+        return f"[LLM Output] Based on the graph: {context_str}."
+
+    except nx.NetworkXNoPath:
+        return "No connection found between these entities."
+
+# Execution
+print(query_graph_rag("Alice", "Initech"))
+# Output: [LLM Output] Based on the graph: Alice CEO_OF Globex. Globex ACQUIRED Initech.
+
+```
+
+### 9. Common Pitfalls & Misconceptions
+
+- **Misconception:** GraphRAG will replace Vector RAG.
+- **Reality:** They solve fundamentally different problems. GraphRAG is for structural topology; Vector RAG is for semantic similarity. The industry standard is moving toward Hybrid systems that utilize both.
+- **Pitfall:** Ignoring Entity Resolution. If your ingestion pipeline extracts "Apple Inc.", "Apple", and "Apple Computer" as three separate nodes, your graph will fracture, and multi-hop queries will hit dead ends. Strict ontology mapping and normalization are mandatory.
+
+### 10. Prerequisites & Next Steps
+
+- **Prerequisites:** Mastery of Vector Databases (Day 40) and Structured Outputs/Information Extraction (Day 15).
+- **Next Steps:** In Day 75, we will examine "Multimodal Pipelines: Vision & Audio," detailing the architectural transition from unimodal text pipelines to multimodal RAG, and establishing strict privacy boundaries for visual data extraction.
+
+### 11. Further Reading & Resources
+
+- Microsoft Research: _GraphRAG: Unlocking LLM discovery on narrative private data_.
+- _Knowledge Graphs: Fundamentals, Techniques, and Applications_ (Mayank Kejriwal).
+- Neo4j Documentation on integrating Cypher with LangChain/LlamaIndex.

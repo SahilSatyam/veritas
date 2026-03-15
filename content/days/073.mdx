@@ -1,0 +1,149 @@
+---
+day: "073"
+title: "AI FinOps: Token Routing & Budgeting"
+failure: "The $10k Weekend"
+lens: "Sustainability"
+domain: "FinOps"
+status: "published"
+tags:
+  [
+    "Model Cascading",
+    "FinOps",
+    "Cost Routing",
+    "Sustainability",
+    "Unit Economics",
+  ]
+date: "2026-03-05"
+---
+
+### Abstract
+
+In single-shot LLM applications, costs scale linearly with user traffic. In multi-agent architectures, costs scale exponentially with autonomous loop execution. This document addresses the critical transition from R&D experimentation to production unit economics. We establish AI FinOps not as a retrospective accounting exercise, but as an active, in-line engineering constraint. By implementing dynamic model routing, contextual budget objects, and strict state-based financial guardrails, organizations can guarantee positive gross margins per tenant while structurally enforcing sustainable inference practices.
+
+### 1. Why This Topic Matters
+
+The primary production failure prevented today is **The $10k Weekend**.
+
+Imagine an uncapped agentic loop deployed on a Friday afternoon. A user triggers a complex research task, and due to a minor edge case in the termination logic, two agents engage in a cyclic debate. Because the system is hardcoded to use a frontier model (e.g., GPT-4-class) for every node, it burns through thousands of dollars in API credits by Monday morning.
+
+In production, financial limits cannot be managed via asynchronous billing dashboard alerts—they are often delayed by 24 hours. If an AI system has the autonomous ability to consume resources, the system itself must have synchronous, deterministic boundaries on its consumption. A system without hardcoded budgeting and model cascading is an unbounded financial liability.
+
+### 2. Core Concepts & Mental Models
+
+To manage AI FinOps effectively, engineering leadership must adopt the following mental models:
+
+- **Token as Currency:** Tokens are not just compute units; they are fractional cents. Every prompt injection and context window expansion is a financial transaction.
+- **Model Cascading:** The practice of attempting a task with a smaller, cheaper, and faster model first (e.g., Llama-3-8B), and only escalating to a massive frontier model if the output fails a deterministic quality check or if the query complexity demands it.
+- **Contextual Budgets:** A budget is not a static database value; it is a live state object passed directly into the execution context of the agent graph, dynamically restricting its operational capabilities as the budget depletes.
+
+### 3. Theoretical Foundations (Only What’s Needed)
+
+The mathematical foundation of AI FinOps is ensuring that the expected cost of an agentic transaction never exceeds the revenue or allocated budget for that transaction. We define the total cost of a multi-agent graph execution $C_{total}$ as the sum of all node executions $i$:
+
+$$C_{total} = \sum_{i=1}^{n} \left( T_{in, i} \cdot P_{in}(M_i) + T_{out, i} \cdot P_{out}(M_i) \right)$$
+
+Where $T$ represents tokens, $P$ represents the price per token, and $M_i$ is the model selected for step $i$.
+
+If a system uses a monolithic frontier model, $P(M_i)$ is constantly at the maximum rate. By introducing a routing function $R(query, budget) \rightarrow M_i$, we optimize the cost integral. For simple tasks (e.g., summarization, formatting), the required parameter count is low, meaning we can mathematically bound $C_{total}$ by routing trivial nodes to models where $P(M_i) \approx 0$.
+
+### 4. Production-Grade Implementation
+
+A production AI FinOps pipeline requires intercepting every LLM call at the orchestration layer:
+
+1. **Tenant Budget Injection:** Before a graph executes, the system retrieves the user's/tenant's current token budget from a fast, low-latency store (e.g., Redis) and injects it into the `GraphState`.
+2. **The Gateway Router:** Agents do not call model APIs directly. They call a unified `LLMGateway`. This gateway assesses the `GraphState` budget.
+3. **Graceful Degradation (Downgrading):** If the budget crosses a critical threshold, the gateway overrides the agent's requested model and routes the prompt to a cheaper, smaller model.
+4. **Synchronous Deduction:** The gateway synchronously deducts the consumed tokens from the tenant's ledger _before_ returning the response to the agent. If the ledger hits zero, it throws an `InsufficientFundsException`, immediately halting the graph.
+
+### 5. Hands-On Project / Exercise
+
+**Constraint:** Build a "Model Router" that automatically downgrades the query to a cheaper model if the user's monthly budget is <10% remaining, logging a specific "Quality Downgrade" event.
+
+**Architecture:**
+
+- **State:** A dictionary containing `user_id`, `prompt`, `monthly_budget_usd`, and `current_spend_usd`.
+- **Router Logic:** The `ModelRouter` calculates the remaining percentage.
+- If $> 10\%$, it routes the request to a premium model (`gpt-4-class`).
+- If $\le 10\%$, it automatically overwrites the target to an economy model (`llama-3-8b-class`), and emits an audit log: `{"event": "Quality Downgrade", "user_id": 123, "reason": "Budget < 10%"}`.
+
+### 6. Ethical, Security & Safety Considerations
+
+**Sustainability Lens: Carbon Impact Awareness.**
+FinOps is inextricably linked to GreenOps. Massive frontier models require vast clusters of GPUs, consuming immense amounts of electricity and water for cooling. Routing every trivial request (like parsing a JSON string or extracting a name) to a trillion-parameter model is not just financially reckless; it is environmentally irresponsible.
+
+Implementing model cascading and pushing tasks to smaller, quantized models (like 8B or 70B parameters) drastically reduces the carbon footprint per inference. Responsible AI engineering demands that we treat compute as a finite, environmentally costly resource. Downgrading models when high reasoning is unnecessary is a core component of sustainable system design.
+
+### 7. Business & Strategic Implications
+
+**Trade-off Resolution: Quality vs. Margin**
+The most fiercely debated FinOps topic is the trade-off between output quality (using the most capable model everywhere) and business margin (using tiered, cheaper models to save costs). Product managers will argue for maximum quality; finance will argue for maximum margin.
+
+_We explicitly resolve this trade-off by treating gross margin as a hard, physical constraint._ Quality cannot exist in a vacuum if the unit economics are negative. The system must dynamically throttle quality to ensure the transaction remains economically viable. If a user has depleted 90% of their tier's budget, the business logic dictates that providing a "good enough" answer via a smaller model is preferable to either eating the financial loss or shutting off their access entirely. Predictable margins fund long-term quality.
+
+### 8. Code Examples / Pseudocode
+
+```python
+import logging
+
+class InsufficientFundsException(Exception):
+    pass
+
+class ModelRouter:
+    def __init__(self, premium_model: str, economy_model: str):
+        self.premium_model = premium_model
+        self.economy_model = economy_model
+        self.logger = logging.getLogger("FinOpsRouter")
+
+    def route_and_execute(self, tenant_state: dict, prompt: str) -> str:
+        # 1. Calculate financial state
+        budget = tenant_state["monthly_budget_usd"]
+        spend = tenant_state["current_spend_usd"]
+        remaining_ratio = (budget - spend) / budget
+
+        # 2. Hard Stop
+        if remaining_ratio <= 0.0:
+            self.logger.error({"event": "Execution Halted", "tenant": tenant_state["tenant_id"]})
+            raise InsufficientFundsException("Budget exhausted. Graph halted.")
+
+        # 3. Dynamic Routing based on < 10% constraint
+        if remaining_ratio <= 0.10:
+            target_model = self.economy_model
+            # REQUIRED: Log the quality downgrade event for audit/UX analytics
+            self.logger.warning({
+                "event": "Quality Downgrade",
+                "tenant_id": tenant_state["tenant_id"],
+                "remaining_ratio": round(remaining_ratio, 3),
+                "model_selected": target_model
+            })
+        else:
+            target_model = self.premium_model
+
+        # 4. Execute and update ledger (Pseudocode)
+        response, cost = self._invoke_llm(target_model, prompt)
+        tenant_state["current_spend_usd"] += cost
+
+        return response
+
+    def _invoke_llm(self, model: str, prompt: str):
+        # Implementation of actual LLM call and token-to-dollar math
+        # Returns (response_text, cost_in_usd)
+        return "Model output", 0.005
+
+```
+
+### 9. Common Pitfalls & Misconceptions
+
+- **Misconception:** FinOps is solved by setting spending limits in the OpenAI/Anthropic dashboard.
+- **Reality:** Vendor-level limits protect the _company_ from bankruptcy, but they do not protect individual _tenants_ from exhausting each other's budgets. Granular, code-level FinOps is required for multi-tenant SaaS.
+- **Pitfall:** Using asynchronous batch jobs to calculate costs. By the time the cron job runs, the uncapped loop has already burned the credits. Budget checks must block execution synchronously.
+
+### 10. Prerequisites & Next Steps
+
+- **Prerequisites:** State Management & Persistence (Day 72) to ensure the budget ledger and graph state are durably stored and accessed.
+- **Next Steps:** In Day 74, we will examine "Knowledge Graphs for RAG: GraphRAG", shifting our implementation focus from algorithmic constraints back to scaling data retrieval and knowledge synthesis in multi-agent workflows.
+
+### 11. Further Reading & Resources
+
+- FrugalGPT: How to Use Large Language Models While Reducing Cost and Improving Performance (Stanford).
+- The FinOps Foundation Framework.
+- _Energy and Policy Considerations for Deep Learning in NLP_ (Strubell et al., on the carbon footprint of AI inference).

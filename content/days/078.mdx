@@ -1,0 +1,136 @@
+---
+day: "078"
+title: "Enterprise Governance: Access Control Lists (ACLs) for RAG"
+failure: "The Salary Leak"
+lens: "Security"
+domain: "Governance & Retrieval"
+status: "published"
+tags: ["RAG", "ACLs", "RBAC", "Security", "Metadata Filtering"]
+date: "2026-03-10"
+---
+
+### Abstract
+
+When an enterprise deploys a Retrieval-Augmented Generation (RAG) system, it flattens the organizational data hierarchy into a single, highly searchable semantic space. Without rigorous access controls, this creates a catastrophic vulnerability: users can organically prompt their way into restricted data. This document establishes Vector Database Access Control Lists (ACLs) and metadata filtering as the mandatory security boundary for production RAG. We dictate that the Large Language Model must never be responsible for evaluating authorization. Security must be cryptographically enforced at the retrieval layer via the "Check-then-Retrieve" pattern, guaranteeing the Principle of Least Privilege.
+
+### 1. Why This Topic Matters
+
+The primary production failure prevented today is **The Salary Leak**.
+
+Imagine a junior engineer asks the internal company RAG bot: _"What is the CEO's salary and equity package?"_ Because the RAG pipeline indiscriminately ingested the entire Google Drive—including the HR and Board of Directors folders—the vector database retrieves the CEO's compensation agreement. The LLM, acting as a helpful assistant, synthesizes the document and outputs the exact figures.
+
+This is not an LLM hallucination; it is a profound governance failure. In traditional file systems, folder permissions prevent this. In vector space, semantic similarity ignores folders. Engineering leadership cannot deploy a knowledge system that inadvertently grants every employee root-level read access to the company's intellectual property, PII, and financial records.
+
+### 2. Core Concepts & Mental Models
+
+To secure RAG systems, engineers must separate the _reasoning engine_ from the _policy engine_.
+
+- **The LLM is Not a Security Boundary:** Prompting an LLM with _"Do not reveal this information to unauthorized users"_ is functionally useless against prompt injection and jailbreaks.
+- **The "Check-then-Retrieve" Pattern (Early Binding):** Authorization must happen _before_ or _during_ the vector search. The vector database is instructed to only search across vectors that the user's active session token is authorized to read.
+- **Role-Based Access Control (RBAC) via Metadata:** Every chunk in the vector database must be tagged with an ACL metadata payload (e.g., `{"allowed_roles": ["hr", "executive"]}`). The user's query must be injected with their authenticated roles.
+
+### 3. Theoretical Foundations (Only What’s Needed)
+
+In an unconstrained vector search, we seek to find the top-$k$ documents $d$ in the corpus $\mathcal{D}$ that maximize the cosine similarity to the query vector $q$:
+
+$$\text{TopK}(q, \mathcal{D}) = \arg\max_{d \in \mathcal{D}} \left( \frac{q \cdot d}{\|q\| \|d\|} \right)$$
+
+To enforce RBAC, we must redefine the search space. Let $U$ be the set of roles possessed by the user making the query. Let $d_{ACL}$ be the set of roles permitted to read document $d$. We define the accessible subset of documents $\mathcal{D}_{U}$ as:
+
+$$\mathcal{D}_{U} = \{ d \in \mathcal{D} \mid U \cap d_{ACL} \neq \emptyset \}$$
+
+The production search function strictly becomes $\text{TopK}(q, \mathcal{D}_{U})$. By applying this constraint at the database execution level, restricted documents mathematically cease to exist in the search space for unauthorized users.
+
+### 4. Production-Grade Implementation
+
+A production ACL pipeline requires synchronization between your Identity Provider (IdP) and your Vector Database.
+
+1. **Ingestion & Tagging:** When a document is processed, the pipeline queries the source system (e.g., Confluence, SharePoint) for its permission model. This ACL is mapped to an array of group IDs and attached to the chunk's metadata before embedding.
+2. **Authentication Handshake:** When a user queries the RAG application, the backend validates their JWT (JSON Web Token) and extracts their `user_group_ids` (e.g., `["engineering", "employee_base"]`).
+3. **Metadata Pre-Filtering:** The backend constructs the vector database query using a hardcoded metadata filter. Most modern vector DBs (Pinecone, Qdrant, Milvus) support `$in` or `$contains` operators that run efficiently via inverted indexes before the dense vector calculation occurs.
+4. **Blind LLM Synthesis:** The LLM receives _only_ the filtered context. If the search returned nothing, the LLM simply states, "I do not have information to answer this."
+
+### 5. Hands-On Project / Exercise
+
+**Constraint:** Implement a RAG retrieval function simulating two users (Admin and Guest). When querying "Secret Project", it must return results for the Admin, but return exactly zero retrieved documents for the Guest, resulting in a clean "No results found" failure mode.
+
+**Architecture:**
+
+- **Vector DB Mock:** A local array of dictionaries representing embedded documents, each containing a `text`, `vector`, and `allowed_roles` metadata array.
+- **Data:** Doc 1: "Public Roadmap". Doc 2: "Secret Project Alpha" (Roles: `["admin"]`).
+- **Retrieval Logic:** A function `retrieve(query_vector, user_roles)` that strictly filters the list using Python set intersections before applying a mock cosine similarity sort.
+- **Execution:**
+  - Guest searches "Secret Project". `user_roles = ["guest"]`. Intersection with Doc 2 is empty. Returns `[]`. LLM outputs "No results found."
+  - Admin searches "Secret Project". `user_roles = ["admin", "employee"]`. Intersection with Doc 2 matches. Returns Doc 2. LLM outputs project details.
+
+### 6. Ethical, Security & Safety Considerations
+
+**Security Lens: The Principle of Least Privilege and Existence Leakage.**
+The Principle of Least Privilege states that a user should only have the minimum access rights necessary to perform their job. Implementing late-binding security (retrieving all documents, then asking code or an LLM to filter them out before display) violates this principle because it allows "Existence Leakage."
+
+If a Guest searches for "Project Alpha" and the system replies, "You are not authorized to view this," the system has inadvertently confirmed that Project Alpha exists. In corporate espionage or internal HR snooping, the mere confirmation of a document's existence is a data breach. Early-binding metadata filtering guarantees that to an unauthorized user, restricted data is indistinguishable from non-existent data.
+
+### 7. Business & Strategic Implications
+
+**Trade-off Resolution: Search Latency vs. Security**
+Applying complex metadata filters to millions of vectors introduces computational overhead. A purely mathematical nearest-neighbor search is blisteringly fast; forcing the database to intersect ACL arrays across inverted indexes before computing distance adds latency (often 50-100ms depending on the architecture).
+
+_We explicitly resolve this trade-off by mandating Security at the expense of Latency._ In enterprise systems, speed without governance is a liability. We accept the latency tax of pre-filtering. To mitigate this, engineering teams must invest in Vector Databases optimized for single-stage filtering (where the metadata index and vector index are co-located) rather than relying on slow, post-retrieval validation loops. You cannot optimize latency by compromising the corporate firewall.
+
+### 8. Code Examples / Pseudocode
+
+```python
+# Pseudocode demonstrating Early-Binding Metadata Filtering
+
+class SecureRetriever:
+    def __init__(self, vector_db_client):
+        self.db = vector_db_client
+
+    def answer_query(self, user_query: str, user_jwt: dict) -> str:
+        # 1. Extract guaranteed authenticated roles from JWT
+        # NEVER trust the client to tell you their roles.
+        user_roles = user_jwt.get("roles", ["guest"])
+
+        # 2. Embed the query
+        query_vector = embed_text(user_query)
+
+        # 3. Execute Check-then-Retrieve via DB-level Metadata Filtering
+        # Example uses generic Vector DB filter syntax
+        search_results = self.db.query(
+            vector=query_vector,
+            top_k=5,
+            filter={
+                "allowed_roles": {"$in": user_roles} # The absolute security boundary
+            }
+        )
+
+        # 4. Handle Empty State (Zero-Trust Retrieval)
+        if not search_results:
+            return "I could not find any information regarding your query."
+
+        # 5. Blind Synthesis
+        context = "\n".join([doc.text for doc in search_results])
+        return synthesize_with_llm(user_query, context)
+
+# Execution Context:
+# Guest Token: {"user": "bob", "roles": ["engineering"]} -> Fails to retrieve HR docs
+# Exec Token: {"user": "alice", "roles": ["engineering", "executive"]} -> Retrieves HR docs
+
+```
+
+### 9. Common Pitfalls & Misconceptions
+
+- **Misconception:** We can just pass the document's ACL and the user's role into the LLM prompt and say: _"If the user's role doesn't match the document's role, refuse to answer."_
+- **Reality:** This is fatal. LLMs are easily manipulated via prompt injection to ignore system instructions. Furthermore, you are wasting valuable context window tokens and compute costs on documents the user shouldn't see anyway.
+- **Pitfall:** Syncing ACLs once at ingestion. If an employee transfers from HR to Marketing, their access to HR documents must be revoked immediately. The RAG system must rely on dynamic JWT role evaluation at query time, not static assumptions.
+
+### 10. Prerequisites & Next Steps
+
+- **Prerequisites:** Vector Database Architecture (Day 40) and Understanding Identity/JWTs.
+- **Next Steps:** In Day 79, we will transition to "Strategic Architecture: Build vs. Buy vs. Fine-tune," examining the mathematical TCO frameworks necessary to prevent runaway infrastructure costs in enterprise AI deployments.
+
+### 11. Further Reading & Resources
+
+- OWASP Top 10 for LLMs (LLM06: Sensitive Information Disclosure).
+- Pinecone / Milvus documentation on Metadata Filtering and Single-Stage Search.
+- NIST SP 800-162: Guide to Attribute Based Access Control (ABAC).

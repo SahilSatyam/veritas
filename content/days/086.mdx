@@ -1,0 +1,131 @@
+---
+day: "086"
+title: "Organizational Design: Architecting the AI Platform Team"
+failure: "Siloed Engineering"
+lens: "Leadership"
+domain: "Platform Engineering"
+status: "published"
+tags: ["AI Gateway", "Golden Path", "Team Topologies", "Governance"]
+date: "2026-03-20"
+---
+
+### Abstract
+
+When AI adoption is driven organically by individual product teams, the inevitable result is "Siloed Engineering." Fifty different teams build fifty different RAG pipelines, resulting in fragmented security postures, duplicated infrastructure, and opaque API costs. Scaling AI requires a deliberate organizational design shift from isolated experimentation to a centralized "Golden Path." This post defines the architecture of the internal AI Platform Team, clarifies the shifting boundaries between Data Scientists and AI Engineers, and establishes the Centralized AI Gateway as the ultimate enforcement point for governance, security, and cost control.
+
+### 1. Why This Topic Matters
+
+The primary production failure this architecture prevents is **"Siloed Engineering."** When software engineers transition into AI, they often wire their microservices directly to frontier APIs (like OpenAI or Anthropic). In a large enterprise, if Customer Success, Engineering, and HR all build independent direct-to-API pipelines, the blast radius for a security breach (e.g., leaking PII to a third-party model) multiplies exponentially.
+
+Furthermore, you incur massive "undifferentiated heavy lifting." Every team is forced to independently solve rate-limiting, prompt versioning, PII redaction, and fallback logic. The strategic imperative is to abstract these non-functional requirements into an internal AI Platform, allowing product teams to focus purely on domain-specific cognitive architectures and user experience.
+
+### 2. Core Concepts & Mental Models
+
+- **The "Golden Path" (Paved Road):** A centrally supported set of tools, libraries, and infrastructure. The implicit contract is: _"If you use the Golden Path, you inherit compliance, logging, and scaling for free. If you go off-path, you own the pager, the compliance audits, and the legal risk."_
+- **The Centralized AI Gateway:** A reverse proxy that sits between your internal corporate network and all external (or internal) LLM providers. It acts as the single choke point for enterprise AI traffic.
+- **Role Clarification:**
+- **Data Scientist:** Focuses on statistical discovery, data quality, and defining business metrics. (Math-first).
+- **Machine Learning Engineer (MLE):** Focuses on training, fine-tuning, and hosting custom weights on GPU clusters. (Infra-first).
+- **AI Engineer:** Focuses on chaining existing models, building RAG systems, prompt engineering, and integrating AI into the software product. (Software-first).
+
+### 3. Theoretical Foundations (Only What’s Needed)
+
+This architectural shift is grounded in **Conway's Law**: _"Organizations which design systems are constrained to produce designs which are copies of the communication structures of these organizations."_
+
+If you have a fragmented organization, you will ship a fragmented, insecure AI architecture. We apply principles from _Team Topologies_, separating the engineering organization into **Stream-Aligned Teams** (the product developers building the HR bot or the trading algorithm) and a **Platform Team** (the engineers building the AI Gateway). The Platform Team's product _is_ the internal developer experience.
+
+### 4. Production-Grade Implementation
+
+**Explicit Trade-off Resolution: Centralization (Control) vs. Team Autonomy (Speed)**
+_The Conflict:_ Security and compliance teams want absolute centralization to prevent data leaks and control costs. Product teams want absolute autonomy to use the latest models and iterate on prompts without waiting for a central committee's approval.
+_The Resolution:_ We resolve this by drawing a hard line at the **AI Gateway**.
+
+- _The Platform Team (Centralized)_ owns the Gateway. They enforce PII scrubbing, enforce cost-per-minute rate limits, route traffic, and manage API keys.
+- _The Product Teams (Autonomous)_ own the prompts, the RAG retrieval logic, the chunking strategy, and the LLM parameters (Temperature, Top-P).
+  The Gateway does not care _what_ the prompt does; it only cares that the payload is safe, authenticated, and budgeted. This gives security their control point without bottlenecking product velocity.
+
+### 5. Hands-On Project / Exercise
+
+**Constraint:** Write a "Request for Comments" (RFC) design doc for an internal AI Platform that defines exactly where PII scanning happens and who owns the model risk.
+
+_Audit Requirement:_ The RFC must be defensible to the CISO, the CFO, and the VP of Engineering.
+
+**RFC Extract: AI Gateway Security & Risk Boundary**
+
+1. **Context:** Moving from decentralized LLM API usage to the AI Gateway.
+2. **Architecture:** All application-level LLM calls must route through `gateway.internal.corp`. Direct outbound calls to `api.openai.com` or `api.anthropic.com` will be blocked at the VPC firewall.
+3. **Boundary Definitions:**
+
+- **PII Scanning:** Executed synchronously at the Gateway layer via a lightweight NER (Named Entity Recognition) model (e.g., Presidio). _Rationale:_ We cannot trust decentralized product teams to perfectly implement PII redaction. Redaction must happen before the payload leaves our network.
+- **Model Risk (Hallucination/Toxicity):** Owned exclusively by the Stream-Aligned App Team. _Rationale:_ The Gateway cannot judge whether a financial summary is "correct" or "hallucinated" as it lacks business context. App teams must implement their own evaluation and fallback logic for model outputs.
+- **Cost Management:** Owned by the Gateway. Every request must include a `x-billing-team-id` header. The Gateway will reject requests that exceed the team's monthly budget constraint.
+
+### 6. Ethical, Security & Safety Considerations
+
+**Lens Applied: Leadership (Responsible AI)**
+
+Ethical AI cannot be achieved by sending developers to a mandatory training seminar. As an engineering leader, your responsibility is to design systems where "Responsible AI" is the path of least resistance.
+
+If a developer has to import a complex library, configure regexes, and manage keys just to scan for PII, they will skip it under deadline pressure. By abstracting PII scanning into the Gateway middleware, you ensure that every single prompt generated by your company is sanitized by default. You engineer responsibility into the infrastructure, making the safe way the easy way.
+
+### 7. Business & Strategic Implications
+
+Without a centralized gateway, the CFO sees a single, massive, six-figure line item for "Cloud AI APIs" at the end of the month. When asked, "Which product feature generated this cost?" engineering cannot answer.
+
+The Platform Team transforms AI from an untraceable black-box expense into a measurable unit of unit economics. By enforcing the Gateway, every inference call is tagged. You can now determine that the "Customer Support Summarizer" costs $0.02 per ticket and saves $4.00 of human labor, while the "Marketing Idea Generator" costs $500/day and yields zero measurable ROI. This visibility is required to survive executive budget reviews.
+
+### 8. Code Examples / Pseudocode
+
+_Gateway configuration using a tool like LiteLLM to enforce the RFC policies:_
+
+```yaml
+model_list:
+  - model_name: gpt-4
+    litellm_params:
+      model: openai/gpt-4
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: claude-3
+    litellm_params:
+      model: anthropic/claude-3-opus
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+litellm_settings:
+  # Enforce central logging to Datadog/Splunk for auditability
+  success_callbacks: ["datadog"]
+
+  # Enforce budget limits per internal team
+  max_budget: 1000 # Default budget in USD
+
+router_settings:
+  # Middleware hook for the RFC's PII scanning requirement
+  # Blocks or masks data BEFORE it hits the external API
+  pii:
+    provider: "microsoft_presidio"
+    rules:
+      - "CREDIT_CARD"
+      - "US_SSN"
+      - "EMAIL_ADDRESS"
+      - "PHONE_NUMBER"
+    action: "mask" # Replaces with <EMAIL_ADDRESS> etc.
+
+  # Enforce that every request carries a billing tag
+  mandatory_params: ["user", "metadata.team_id"]
+```
+
+### 9. Common Pitfalls & Misconceptions
+
+- **Misconception:** "We need to hire a team of ML Engineers to build our LLM apps."
+  **Reality:** If you are consuming APIs or hosting quantized open-weight models, you need _AI Engineers_ (strong software engineers with systems thinking). Hiring distributed systems experts or statisticians to write RAG pipelines is a misallocation of talent.
+- **Pitfall: The Gateway as a Bottleneck.** If the platform team insists on reviewing every prompt change, they will destroy product velocity. The platform must remain strictly infrastructure-focused, entirely decoupled from application business logic.
+- **Pitfall: Vendor Lock-in at the App Layer.** If product teams hardcode `import openai`, switching models takes weeks. The Gateway should expose a unified, OpenAI-compatible endpoint so teams can swap to Claude or Llama behind the scenes with a single configuration change.
+
+### 10. Prerequisites & Next Steps
+
+**Prerequisites:** Deep understanding of VPCs, reverse proxies (Nginx/Envoy), API Gateways, and enterprise cost allocation.
+**Next Steps:** In Day 87, we will cover "Global Compliance Engineering: Operationalizing the EU AI Act," utilizing the AI Gateway not just for routing, but as the foundational telemetry layer to fulfill legal traceability requirements.
+
+### 11. Further Reading & Resources
+
+- _Team Topologies_ (Skelton & Pais) - Foundational text for organizing tech teams.
+- _LiteLLM Documentation_ - The industry standard open-source AI Gateway.
+- _Building a Paved Road for AI_ (Various engineering blogs from Netflix, Uber, etc., adapting their platform engineering models to generative AI).
