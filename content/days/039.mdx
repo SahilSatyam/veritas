@@ -11,7 +11,7 @@ date: "2026-02-08"
 
 ### Abstract
 
-Vector databases are the long-term memory of AI applications, but they behave differently than relational databases at scale. A common production outage occurs when a team migrates from a prototype (10k vectors) to production (100M vectors) and realizes that **filtered vector search**—e.g., "Find similar documents _owned by User A_"—causes latency to spike from 20ms to 2000ms. This is the "Metadata Explosion." This post dissects the mechanics of Approximate Nearest Neighbor (ANN) search under constraints, focusing on HNSW parameter tuning, indexing strategies for metadata, and the critical security architecture required for rigorous multi-tenancy.
+Vector databases are the long-term memory of AI applications, but they behave differently than relational databases at scale. A common production outage occurs when a team migrates from a prototype (10k vectors) to production (100M vectors) and realizes that **filtered vector search**—e.g., "Find similar documents _owned by User A_"—causes latency to spike from 20ms to 2000ms. This is the "Metadata Explosion." This post dissects the mechanics of Approximate Nearest Neighbor (ANN) search under constraints, focusing on HNSW parameter tuning, indexing strategies for metadata in modern engines (like **Qdrant** as the primary open-source leader, or **Pinecone** v3+ utilizing gRPC and serverless namespaces), and the critical security architecture required for rigorous multi-tenancy.
 
 ### 1. Why This Topic Matters
 
@@ -27,6 +27,7 @@ The core issue is **Tenant Isolation**. If you build a B2B RAG application, Clie
 - **Pre-filtering**: Filter by Metadata $\to$ Search Remaining Vectors. _Risk:_ If the filtered subset is small or scattered, the HNSW graph traversal breaks because the "highways" don't connect the remaining nodes.
 
 - **Single-Stage Filtering (The Solution)**: Modern vector DBs use "Bitmasking" or "Block-based searching" to traverse the graph while ignoring blocked nodes efficiently.
+- **pgvector 0.7+ Improvements**: For relational databases, pgvector 0.7+ has significantly advanced HNSW indexing directly inside PostgreSQL, matching dedicated vector DB speeds for many use cases.
 
 ### 3. Theoretical Foundations
 
@@ -58,7 +59,7 @@ There are two approaches to isolation:
 - _Pros_: Easy operations. Efficient resource sharing.
 - _Cons_: Requires **Metadata Indexing**. Without it, the DB performs a full table scan.
 
-**Recommendation**: Use Logical Separation with strict Metadata Indexing for standard SaaS. Use Namespaces only for VIP tenants requiring physical isolation.
+**Recommendation**: Use Logical Separation with strict Metadata Indexing (such as Qdrant payload-based filtering or pgvector 0.7+ indexes) for standard SaaS. Use Namespaces (like Pinecone's serverless namespaces with gRPC clients) only for VIP tenants requiring physical isolation.
 
 ### 5. Hands-On Project / Exercise
 

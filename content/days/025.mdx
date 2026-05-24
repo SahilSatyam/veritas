@@ -30,7 +30,7 @@ If you build a chatbot without explicit memory engineering, it behaves like the 
 #### The "Stateless" Reality
 
 The API call `client.chat(message="What is my name?")` has zero knowledge of previous calls.
-**Memory = Storage + Retrieval.** You must store the transcript in a database (Redis/Postgres) and retrieve the relevant slice to append to the prompt before sending it to the model.
+**Memory = Storage + Retrieval.** You must store the transcript in a database (Redis/Postgres), or leverage dedicated LLM memory platforms like **Zep** or **LangMem** that automatically extract long-term user facts and optimize context retrieval.
 
 #### Strategies for Context Management
 
@@ -177,7 +177,7 @@ while True:
 
 ### 9. Next Steps
 
-1. **Select:** Choose a backing store (Redis is standard for hot session state).
+1. **Select:** Choose a backing store (Redis is standard for hot session state, while purpose-built memory layers like **Zep** or **LangMem** specialize in extracting long-term personalization, graphs, and structured user facts across sessions).
 2. **Implement:** Build the `MemoryManager` wrapper around your API calls.
 3. **Configure:** Set a `MAX_TOKENS` limit (e.g., 4096) for the history buffer to prevent API errors.
 

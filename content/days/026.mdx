@@ -179,6 +179,7 @@ def test_semantic_similarity():
 ### 8. Common Pitfalls
 
 - **The "Single Question" Test:** Testing only "Hello" and assuming the bot works. You need a **Golden Dataset** of at least 50-100 diverse examples (easy, hard, adversarial).
+- **Benchmarks:** While public benchmarks like **MMLU-Pro** (evaluating harder reasoning), **MT-Bench** (for multi-turn chat dynamics), and **LiveBench** (frequently updated to prevent model contamination) serve as helpful general baseline indicators, they are not substitutes for your domain-specific Golden Dataset.
 - **Ignoring Latency:** An accurate answer that takes 45 seconds is a failure in a chat context. Add `assert execution_time < 3.0` to your tests.
 
 ### 9. Next Steps

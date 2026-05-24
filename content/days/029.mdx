@@ -35,7 +35,7 @@ When a query comes in, the search starts at the top layer ("Interstate") to quic
 
 #### The Landscape: Specialized vs. Integrated
 
-1. **Specialized (Pinecone, Weaviate, Qdrant):** Built from scratch for vectors.
+1. **Specialized (Qdrant, Pinecone, Weaviate, Chroma):** Built from scratch for vectors. Qdrant has emerged as the dominant Rust-based open-source production leader, while Pinecone serves as a standard managed SaaS option (using the modern v3+ class-based `Pinecone()` constructor rather than the deprecated `pinecone.init()`). Weaviate offers rich graph-like structural queries, and Chroma is the standard for local in-memory prototyping.
 
 - _Pros:_ Extremely fast, advanced hybrid search (keyword+vector), managed scaling.
 - _Cons:_ Another piece of infrastructure to maintain/pay for. Data consistency lag.

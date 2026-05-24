@@ -51,6 +51,13 @@ By stacking our previous patterns—ReAct Boundaries (Day 61), Schema Validation
 
 ### 4. Production-Grade Implementation
 
+**The Production Capstone Stack**
+To productionize this capstone, you should avoid custom ad-hoc orchestrators and instead build upon the standard enterprise stack:
+- **Orchestration:** **LangGraph** (the primary industry framework for stateful, graph-based control).
+- **Execution Sandbox:** **E2B.dev** or Firecracker microVMs (for secure, cloud-hosted dynamic code execution).
+- **Memory Retrieval:** **Qdrant** or Pinecone v3+ (for robust, payload-filtered vector storage).
+- **Gateway & FinOps:** **LiteLLM Proxy** (for centralized token cost management, budget caps, and API routing).
+
 **Resolving the Trade-off: Autonomy vs. Control**
 Business stakeholders will push for 100% autonomy to maximize ROI and reduce headcount. Security teams will push for 100% control, rendering the agent useless.
 
@@ -177,7 +184,7 @@ class AutonomousAnalyst:
 ### 9. Common Pitfalls & Misconceptions
 
 - **Misconception:** Orchestration frameworks (LangChain, AutoGen) replace the need to understand these boundaries. _Correction:_ Frameworks abstract the complexity, but when the abstraction leaks (and it will), you must understand the underlying primitives to debug the state collapse or sandbox escape.
-- **Pitfall:** Treating the logs as an afterthought. If your agent fails during the `PythonSandbox` step, and your trace doesn't contain the exact code the LLM generated, you cannot debug the prompt. Telemetry is a hard requirement for agentic systems.
+- **Pitfall:** Treating the logs as an afterthought. If your agent fails during the `PythonSandbox` step, and your trace doesn't contain the exact code the LLM generated, you cannot debug the prompt. Telemetry is a hard requirement for agentic systems (leveraging LangGraph as the production standard for orchestrating graph-based control structures).
 
 ### 10. Prerequisites & Next Steps
 

@@ -47,7 +47,7 @@ A production ACL pipeline requires synchronization between your Identity Provide
 
 1. **Ingestion & Tagging:** When a document is processed, the pipeline queries the source system (e.g., Confluence, SharePoint) for its permission model. This ACL is mapped to an array of group IDs and attached to the chunk's metadata before embedding.
 2. **Authentication Handshake:** When a user queries the RAG application, the backend validates their JWT (JSON Web Token) and extracts their `user_group_ids` (e.g., `["engineering", "employee_base"]`).
-3. **Metadata Pre-Filtering:** The backend constructs the vector database query using a hardcoded metadata filter. Most modern vector DBs (Pinecone, Qdrant, Milvus) support `$in` or `$contains` operators that run efficiently via inverted indexes before the dense vector calculation occurs.
+3. **Metadata Pre-Filtering:** The backend constructs the vector database query using a hardcoded metadata filter. Most modern vector DBs (such as **Pinecone v3+** metadata filtering or **Qdrant** payload-based filtering) support `$in` or `$contains` operators that run efficiently via inverted indexes before the dense vector calculation occurs.
 4. **Blind LLM Synthesis:** The LLM receives _only_ the filtered context. If the search returned nothing, the LLM simply states, "I do not have information to answer this."
 
 ### 5. Hands-On Project / Exercise

@@ -10,7 +10,7 @@ date: "2026-01-27"
 
 ### Abstract
 
-Manual evaluation is the enemy of velocity. If you rely on humans to review every model output before release, your iteration cycle is measured in weeks, not hours. To achieve Continuous Deployment (CD) for AI, we must decouple "Confidence" from "Human Effort." This post details the **LLM-as-a-Judge** pattern: using a highly capable "Teacher" model (e.g., Claude Opus 4.5) to evaluate the outputs of production models, enabling scalable, automated quality gates.
+Manual evaluation is the enemy of velocity. If you rely on humans to review every model output before release, your iteration cycle is measured in weeks, not hours. To achieve Continuous Deployment (CD) for AI, we must decouple "Confidence" from "Human Effort." This post details the **LLM-as-a-Judge** pattern: using a highly capable "Teacher" model (e.g., GPT-4o or Claude 3.7 Sonnet) to evaluate the outputs of production models, enabling scalable, automated quality gates.
 
 ---
 
@@ -26,9 +26,9 @@ In traditional software, unit tests run in milliseconds. In AI, "tests" often in
 
 You typically use a massive, expensive model (The Judge) to grade the outputs of a faster, cheaper model (The Student).
 
-- **Student:** GPT-4o-mini / Llama-3-8B (Production Runner).
-- **Judge:** GPT-5.2-Thinking / Claude Opus 4.5 (Offline Auditor).
-- **Why?** The Judge is too slow/expensive for users, but perfect for batch testing.
+- **Student:** GPT-4o-mini / Llama-3.3-8B (Production Runner).
+- **Judge:** GPT-4o / Claude 3.7 Sonnet / Prometheus-2 (Offline Auditor).
+- **Why?** The Judge is too slow/expensive for real-time users, but perfect for offline batch testing. Prometheus-2 offers an excellent open-source alternative designed specifically for LLM evaluation.
 
 #### Pairwise Comparison (A/B Testing)
 
@@ -55,7 +55,7 @@ This mimics human preference ranking (RLHF) and yields more stable results than 
 **No Self-Grading.**
 Never use the same model to grade itself. A model usually shares its own biases. If `GPT-4o` hallucinates a fact, `GPT-4o` (acting as judge) is likely to accept that hallucination as truth.
 
-- _Rule:_ Cross-check. If using OpenAI for generation, use Anthropic for evaluation (and vice-versa). This reduces the risk of shared "blind spots."
+- _Rule:_ Cross-check. If using OpenAI for generation, use Anthropic for evaluation (and vice-versa), or deploy the **G-Eval** framework to structure the evaluation rubric with detailed chain-of-thought steps. This reduces the risk of shared "blind spots."
 
 ### 5. Hands-On Project: The "Summarization Showdown"
 
@@ -108,7 +108,7 @@ def evaluate_summaries(article: str, summary_a: str, summary_b: str, judge_clien
     """
 
     response = judge_client.chat.completions.create(
-        model="claude-3-opus-20240229", # The "Teacher" Model
+        model="claude-3-7-sonnet", # The "Teacher" Model
         messages=[
             {"role": "system", "content": judge_system_prompt},
             {"role": "user", "content": user_content}

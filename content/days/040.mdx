@@ -43,6 +43,11 @@ Where $A$ and $B$ are tiny compared to $W$. This reduces trainable parameters by
 
 **QLoRA**: Adds quantization (4-bit precision) to the frozen weights, further lowering memory requirements.
 
+**Advanced PEFT & Post-Training Techniques**:
+- **DoRA (Weight-Decomposed Low-Rank Adaptation)**: Decomposes the weights into magnitude and directional components, updating both to achieve training accuracy closer to full fine-tuning.
+- **GaLore (Gradient Low-Rank Projection)**: Projecting the gradient matrix of weights into low-rank representations, enabling full-parameter training of large models on consumer-grade hardware.
+- **MoE Fine-tuning**: Fine-tuning specialized subsets of parameters in Mixture of Experts (MoE) architectures, isolating task behaviors dynamically.
+
 ### 4. Production-Grade Implementation
 
 **The Pivot Point**

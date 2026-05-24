@@ -30,6 +30,10 @@ When a user deletes their account, removing their rows from PostgreSQL is easy. 
 1. **Exact Unlearning:** The resulting model is _mathematically identical_ to one trained without the data. (Gold Standard).
 2. **Approximate Unlearning:** Modifying weights (e.g., gradient ascent on the deleted point) to "scrub" the influence. (Faster, but no theoretical guarantee the data is truly gone).
 
+**Evaluation & Benchmarking (MUSE & NeurIPS)**
+- **MUSE (Machine Unlearning Six-Way Evaluation)**: The state-of-the-art 2025 evaluation standard that tests unlearning across six key dimensions, including membership privacy, model utility preservation, and robustness against model extraction attacks.
+- **NeurIPS Machine Unlearning Competition**: Established standardized benchmarks, proving that while approximate unlearning is fast, **SISA** (Sharded, Isolated, Sliced, Aggregated) remains the foundational, highly reliable baseline architecture for exact unlearning in enterprise production environments.
+
 **The SISA Architecture**
 
 To achieve Exact Unlearning without full retraining, we divide and conquer.

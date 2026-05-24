@@ -11,7 +11,7 @@ date: "2026-02-05"
 
 ### Abstract
 
-In deterministic software, a stack trace is usually sufficient to identify the root cause of a failure. In probabilistic AI systems, a "crash" is the least worrying failure mode. The real dangers are silent failures: a retrieval step that returns zero documents, a prompt template that truncates the context, or a model that drifts in latency. Without **Distributed Tracing**, an LLM application is a black box where input goes in and (maybe) output comes out. This post establishes the architecture for deep observability using OpenTelemetry (OTel), moving beyond simple logging to hierarchical, time-bound spans that visualize the exact execution path of a cognitive chain.
+In deterministic software, a stack trace is usually sufficient to identify the root cause of a failure. In probabilistic AI systems, a "crash" is the least worrying failure mode. The real dangers are silent failures: a retrieval step that returns zero documents, a prompt template that truncates the context, or a model that drifts in latency. Without **Distributed Tracing**, an LLM application is a black box where input goes in and (maybe) output comes out. This post establishes the architecture for deep observability using OpenTelemetry (OTel) alongside modern LLM observability platforms like **LangSmith**, **Arize Phoenix**, and **Langfuse**, moving beyond simple logging to hierarchical, time-bound spans that visualize the exact execution path of a cognitive chain.
 
 ### 1. Why This Topic Matters
 
@@ -229,5 +229,5 @@ The output will visually demonstrate:
 ### 10. Further Reading & Resources
 
 - **Standard**: _OpenTelemetry (OTel) Semantic Conventions for LLMs_.
-- **Tools**: _LangSmith_ (LangChain), _Arize Phoenix_ (Open Source), _Lunary_.
+- **Tools**: _LangSmith_ (LangChain tracking), _Arize Phoenix_ (Open-source semantic evaluations), _Langfuse_ (Open-source LLM engineering platform), and _OpenTelemetry_ semantic conventions.
 - **Concept**: _Distributed Tracing in Microservices_.

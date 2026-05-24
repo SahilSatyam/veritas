@@ -42,7 +42,7 @@ The architecture follows a strictly local "Map-Reduce" pattern:
 
 ### 4. Production-Grade implementation
 
-In production, we use **Microsoft Presidio** for identification (using Models + Regex) and deanonymization. However, custom logic is often required for the _rehydration_ step to ensure the mapping persists across the request lifecycle.
+In production, we use **Microsoft Presidio** (the leading multi-language open-source PII engine) or cloud-native options like **AWS Comprehend PII detection** for identification and deanonymization. However, custom logic is often required for the _rehydration_ step to ensure the mapping persists across the request lifecycle.
 
 **Trade-off: Context Loss**
 If you mask "Apple" (the company) as `<ORG_1>`, the model might lose the nuance of it being a tech company versus a fruit. Advanced strategies use **Synthetic Replacement** (replacing "Alice" with "Jane", "Google" with "Acme Corp") to maintain semantic density, but this increases the complexity of rehydration.

@@ -16,7 +16,7 @@ AI engineering is not just code; it is logistics. The transition from a laptop C
 
 The cloud is an infinite resource, but your budget is not.
 
-- **The "Weekend" Failure:** A P4d.24xlarge instance on AWS costs approximately \$32/hour. Leaving it running from Friday 5 PM to Monday 9 AM costs **\$2,048** for zero work. This is a fireable offense in many startups.
+- **The "Weekend" Failure:** A P4d.24xlarge instance on AWS costs approximately \$32/hour, while custom Trainium instances offer up to 50% better price-performance. Leaving it running from Friday 5 PM to Monday 9 AM costs **\$2,048** for zero work. This is a fireable offense in many startups.
 - **The VRAM Wall:** You cannot "download more RAM." If your model requires 24GB of VRAM and you provision an A10G (24GB) but load a 32-bit float version of Llama-3, it will crash immediately. Understanding hardware constraints is a prerequisite for deployment.
 - **Carbon Responsibility:** Training a single large model can emit as much carbon as five cars in their lifetimes. Efficient infrastructure is not just cheaper; it is an ethical imperative.
 
@@ -61,6 +61,11 @@ Spot instances are cheap because the cloud provider can reclaim them with a 2-mi
 ### 4. Production-Grade Implementation
 
 We adopt a **"Self-Destruct" Architecture** for experimental workloads. The infrastructure code should explicitly define the lifespan of the resource.
+
+**The Stack:**
+
+- **Compute & Accelerators:** AWS EC2 instances with NVIDIA GPUs (e.g., A10G for inference, H100/A100 for training), or AWS Inferentia2 / Trainium2 chips (purpose-built custom silicon for high-efficiency, cost-effective inference and training). GCP offers TPU v5e for scaled neural net training.
+- **Inference Engines:** Groq LPUs (Language Processing Units) for ultra-low latency, real-time inference on open-weight models.
 
 **Sustainability Lens:**
 

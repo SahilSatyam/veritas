@@ -78,7 +78,7 @@ We will compare "Naive" vs. "Recursive" splitting on a complex text to visualize
 
 **Scenario:** Parsing a technical specification with headers and lists.
 
-#### The Implementation (using `langchain` logic)
+#### The Implementation (using standard recursive logic common in modern RAG frameworks like **LangChain v0.3+** and **LlamaIndex v0.10+**)
 
 ```python
 from typing import List
@@ -156,7 +156,7 @@ for i, c in enumerate(rec_chunks):
 ### 8. Next Steps
 
 1. **Audit:** Look at your current chunks. Are they cutting off sentences?
-2. **Upgrade:** Switch from `CharacterTextSplitter` to `RecursiveCharacterTextSplitter`.
+2. **Upgrade:** Switch from a naive `CharacterTextSplitter` to a robust `RecursiveCharacterTextSplitter` in **LangChain v0.3+**, or utilize **LlamaIndex v0.10+**'s data-centric ingestion parsing pipelines.
 3. **Plan:** Design the "Manifest Table" for your database to handle updates/deletes.
 
 ### Coming Up Next

@@ -67,9 +67,9 @@ During the Value Function evaluation phase, the Critic model evaluates Branch B.
 
 ### 7. Business & Strategic Implications
 
-We are transitioning from "Training Compute" to "Inference Compute." Historically, the only way to make a model smarter was to train a larger foundation model. Tree of Thoughts proves that you can dramatically increase the effective intelligence and reliability of an _existing_ model simply by giving it more time and compute to "think" during inference.
+We are transitioning from "Training Compute" to "Inference Compute" (Test-Time Compute). Historically, the only way to make a model smarter was to train a larger foundation model. Today, models like **OpenAI o1/o3**, **Claude 3.7 Sonnet (Extended Thinking)**, and **Gemini 2.0 Flash (Thinking)** implement inference-time search and reasoning trace budgets *natively* inside the model architecture itself, proving that giving models more time to "think" during inference yields superior reasoning capabilities.
 
-For technical executives, this dictates a shift in unit economics: budget for "Test-Time Compute." You can achieve GPT-5 level reasoning on GPT-4 class models by wrapping them in robust MCTS scaffolding.
+For technical executives, this dictates a major shift in unit economics: budget explicitly for "Test-Time Compute." For open-weights deployments or custom domains, implementing external Tree of Thoughts (ToT) or MCTS scaffolding on top of smaller base engines allows you to achieve frontier-level logical reasoning at a fraction of the cost.
 
 ### 8. Code Examples / Pseudocode
 

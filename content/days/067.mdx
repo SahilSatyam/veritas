@@ -171,7 +171,11 @@ router.route_query("This is unacceptable, I want a refund.")
 ### 10. Prerequisites & Next Steps
 
 - **Prerequisites:** Mastery of ReAct tool isolation (Day 64) and Context Window Economy/Memory Management (Day 63) to execute state transfers cleanly.
-- **Next Steps:** Moving beyond simple A/B routing into Stateful Graph Orchestration (e.g., using LangGraph or AutoGen) to manage complex, multi-step agent-to-agent negotiation workflows.
+- **Next Steps:** Moving beyond simple A/B routing into production-grade multi-agent frameworks. Modern frameworks have matured around distinct design patterns:
+  - **LangGraph**: Enforces rigid, state-machine-like multi-agent control graphs with persistence.
+  - **Microsoft AutoGen 0.4**: Offers highly scalable, event-driven, asynchronous multi-agent communications.
+  - **CrewAI**: Provides intuitive, role-based, collaborative agent squads.
+  - **OpenAI Swarm**: Represents a lightweight, educational handoff pattern directly mimicking tool-calling routines.
 - **Day 68:** Agent Observability: Tracing the Loop and Preventing 'The Infinite Spend'.
 
 ### 11. Further Reading & Resources

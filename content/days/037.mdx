@@ -59,7 +59,7 @@ User: <user_input>{user_input}</user_input>
 ```
 
 **2. The Guardrail API**
-In production, we use dedicated security APIs (like Azure Content Safety, Lakera Guard, or open-source equivalents like NVIDIA NeMo Guardrails) to score the input for jailbreak signatures before it hits the LLM.
+In production, we use dedicated security APIs and frameworks like **Guardrails AI** (leveraging modern v0.5+ API runner patterns), **NVIDIA NeMo Guardrails** (for programmable dialog rails), **LLM Guard** (a robust open-source security toolkit), or **LakeraGuard** / **Azure Content Safety** to scan and score prompt inputs before they ever hit the LLM.
 
 ### 5. Hands-On Project / Exercise
 

@@ -5,13 +5,13 @@ lens: "Privacy"
 domain: "LLMs"
 day: "048"
 status: "locked"
-tags: ["Llama 3", "Privacy", "Quantization", "Ollama", "On-Prem"]
+tags: ["Llama 3.3", "Privacy", "Quantization", "Ollama", "On-Prem"]
 date: "2026-02-24"
 ---
 
 ### Abstract
 
-For many industries—defense, healthcare, legal, and finance—the "API Economy" is a non-starter. Sending a patient's medical history or a client's merger strategy to a public cloud inference endpoint (even one with "Enterprise" guarantees) constitutes an unacceptable risk or a direct violation of data sovereignty laws (GDPR, HIPAA, ITAR). The solution is **Local Inference**: bringing the model to the data, rather than sending the data to the model. This post explores the engineering reality of running state-of-the-art open-weights models (like Llama 3 or Mistral) on your own infrastructure, trading raw intelligence for absolute control.
+For many industries—defense, healthcare, legal, and finance—the "API Economy" is a non-starter. Sending a patient's medical history or a client's merger strategy to a public cloud inference endpoint (even one with "Enterprise" guarantees) constitutes an unacceptable risk or a direct violation of data sovereignty laws (GDPR, HIPAA, ITAR). The solution is **Local Inference**: bringing the model to the data, rather than sending the data to the model. This post explores the engineering reality of running state-of-the-art open-weights models (like Llama 3.3, Phi-4, Gemma 3, or Qwen 2.5) on your own infrastructure, trading raw intelligence for absolute control.
 
 ### 1. Why This Topic Matters
 
@@ -28,8 +28,8 @@ The convenience of `import openai` masks a massive compliance liability. When yo
 
 **The Intelligence vs. Control Trade-off**
 
-- **Public Cloud (GPT-4/Claude 3):** Massive parameter counts (Trillions), high reasoning capability, zero privacy control.
-- **Local (Llama-3-8B / Mixtral):** Smaller parameter counts (Billions), lower reasoning capability, 100% privacy control.
+- **Public Cloud (GPT-4o/Claude 3.7):** Massive parameter counts (Trillions), high reasoning capability, zero privacy control.
+- **Local (Llama 3.3, Phi-4, Gemma 3, or Qwen 2.5):** Smaller but highly optimized parameter counts (3B to 72B), lower general reasoning but easily adaptable, 100% privacy control.
 
 **Quantization (The Compression Key)**
 To run a model locally, it must fit in your GPU's VRAM.
@@ -41,8 +41,9 @@ To run a model locally, it must fit in your GPU's VRAM.
 **Inference Engines**
 
 - **Llama.cpp:** The C++ backend that made CPU/Apple Silicon inference possible.
-- **Ollama:** The "Docker for LLMs." Wraps llama.cpp in a user-friendly API.
-- **vLLM:** High-throughput serving engine for production clusters (requires NVidia GPUs).
+- **Ollama:** The standard "Docker for LLMs" that wraps llama.cpp in a developer-friendly API.
+- **Apple MLX:** Apple's native machine learning framework designed specifically for Apple Silicon, allowing unified memory LLM execution at extreme speeds.
+- **vLLM / SGLang:** High-throughput serving engines for production clusters with advanced paging and speculative execution.
 
 ### 3. Theoretical Foundations
 
@@ -227,7 +228,7 @@ Just because a model is offline doesn't mean it's safe from prompt injection. If
 
 ### 8. Common Pitfalls & Misconceptions
 
-- **"Local is too stupid":** This was true in 2022. With Llama 3 and Mistral, an 8B parameter model beats GPT-3.5 on many benchmarks. For summarization, classification, and extraction, they are often _better_ because you can fine-tune them on your specific data.
+- **"Local is too stupid":** This was true in 2022. With Llama 3.3 and Mistral, an 8B parameter model beats GPT-3.5 on many benchmarks. For summarization, classification, and extraction, they are often _better_ because you can fine-tune them on your specific data.
 - **VRAM OOM (Out of Memory):** The most common error.
 - _Fix:_ Use `GGUF` quantization (Q4_K_M or Q5_K_M). Never try to run full FP16 weights on consumer cards.
 

@@ -55,7 +55,7 @@ We rarely watermark raw pixels because changes are easily destroyed by compressi
 
 ### 4. Production-Grade Implementation
 
-We implement a pipeline that applies a **robust invisible watermark**. While commercial APIs (like Google SynthID) are powerful, we use open standard algorithms to demonstrate the mechanics of resistance against the "JPEG 80% + Resize" attack.
+We implement a pipeline that applies a **robust invisible watermark**. Standard production implementations have matured around the **Coalition for Content Provenance and Authenticity (C2PA)** ecosystem—with **Adobe Content Credentials** providing cryptographic provenance UI overlays and Google's **SynthID** representing the state-of-the-art in robust, model-based invisible watermarking for text, audio, and images. Here, we demonstrate the mechanics using open standard algorithms to resist the "JPEG 80% + Resize" attack.
 
 **Architecture:**
 

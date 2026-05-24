@@ -112,7 +112,7 @@ print(result.cve_id) # Guaranteed to match the CVE regex
 ### 9. Common Pitfalls & Misconceptions
 
 - **Misconception:** OpenAI's "JSON Mode" is the same as FSM decoding.
-  **Reality:** Most standard API "JSON modes" only guarantee that the output is _some_ valid JSON. They do not guarantee it matches _your specific schema_ or nested types. True FSM decoding (like OpenAI's recently introduced "Structured Outputs" with `strict: true` or open-source `outlines`) enforces the exact schema.
+  **Reality:** Most standard API "JSON modes" only guarantee that the output is _some_ valid JSON. They do not guarantee it matches _your specific schema_ or nested types. True FSM decoding (like OpenAI's native Structured Outputs with `strict: true`, Anthropic's tool-use API, the **Instructor** library for Pydantic integration, or open-source **Outlines**) enforces the exact schema.
 - **Pitfall: Token Boundary Clashes.** Regular expressions operate on characters, but LLMs operate on tokens. Sometimes a valid Regex state can be violated if the tokenizer greedily chunks characters in a way the FSM didn't anticipate. Production libraries handle this alignment, but writing custom logit processors from scratch often falls into this trap.
 - **Pitfall: Over-constraining.** Forcing a model to output purely Boolean `true`/`false` without a reasoning scratchpad drastically reduces the accuracy of the underlying classification.
 

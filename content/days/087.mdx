@@ -46,7 +46,9 @@ This maps directly to **ISO/IEC 42001** (Artificial Intelligence Management Syst
 
 **Explicit Trade-off Resolution: Innovation Velocity vs. Compliance Documentation**
 _The Conflict:_ Product teams are measured on how fast they ship features. Compliance mandates exhaustive documentation, data lineage tracking, and bias testing, which introduces massive friction and slows deployment to a crawl.
-_The Resolution:_ We resolve this by implementing **Compliance-as-Code (DocOps)**. We do not ask engineers to write Word documents. Instead, we mandate that all training pipelines (e.g., MLflow, Weights & Biases) and CI/CD runners automatically emit JSON metadata. The Annex IV Technical Documentation is strictly a compiled artifact generated dynamically from these logs during the build process. If a model fails its automated bias fairness threshold test in staging, the build breaks, and the release is blocked. Compliance becomes a deterministic gate in the deployment pipeline, preserving velocity by eliminating manual paperwork.
+_The Resolution:_ Under the EU AI Act (August 2024 enforcement), key deadlines are now active: prohibited systems (Feb 2025), general-purpose AI (GPAI) rules (Aug 2025), and high-risk AI system requirements (Aug 2026). The EU AI Office oversees compliance.
+
+We resolve this by implementing **Compliance-as-Code (DocOps)**. We do not ask engineers to write Word documents. Instead, we mandate that all training pipelines (e.g., MLflow, Weights & Biases) and CI/CD runners automatically emit JSON metadata. The Annex IV Technical Documentation is strictly a compiled artifact generated dynamically from these logs during the build process. If a model fails its automated bias fairness threshold test in staging, the build breaks, and the release is blocked. Compliance becomes a deterministic gate in the deployment pipeline, preserving velocity by eliminating manual paperwork.
 
 ### 5. Hands-On Project / Exercise
 

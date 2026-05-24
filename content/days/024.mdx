@@ -107,24 +107,26 @@ def extract_from_email(email_body: str, client):
         }
     }]
 
-    # 2. Call the API with "tool_choice" forced
+    # 2. Call the API using OpenAI Structured Outputs (JSON Schema strict mode)
     response = client.chat.completions.create(
-        model="gpt-5.2-instant", # or gpt-4o
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": "You are a data extraction engine. Extract the expense details exactly."},
             {"role": "user", "content": email_body}
         ],
-        tools=tools,
-        tool_choice={"type": "function", "function": {"name": "extract_expense"}} # FORCE the call
+        response_format={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "expense_extraction",
+                "schema": ExpenseItem.model_json_schema(),
+                "strict": true
+            }
+        }
     )
 
-    # 3. Securely Parse
-    tool_call = response.choices[0].message.tool_calls[0]
-    arguments = json.loads(tool_call.function.arguments)
-
-    # 4. Validate with Pydantic (This catches hallucinations like "Amount: One Million")
+    # 3. Securely Parse using Pydantic v2 model validation
     try:
-        expense = ExpenseItem(**arguments)
+        expense = ExpenseItem.model_validate_json(response.choices[0].message.content)
         return expense
     except ValueError as e:
         print(f"[SECURITY BLOCK] Validation failed: {e}")

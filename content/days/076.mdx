@@ -25,7 +25,11 @@ To engineer alignment, we must abandon the mental model of "prompting for behavi
 
 - **The Preference Pair $(x, y_w, y_l)$:** The atomic unit of alignment data. For a given prompt ($x$), you provide a winning response ($y_w$) and a losing response ($y_l$).
 - **RLHF (Reinforcement Learning from Human Feedback):** The legacy approach. It requires training a separate Reward Model to score outputs, then using unstable algorithms like Proximal Policy Optimization (PPO) to update the main model. It is notoriously fragile and requires massive compute overhead.
-- **DPO (Direct Preference Optimization):** The modern engineering standard. DPO mathematically proves that the language model _itself_ can act as the reward model. It treats alignment as a simple binary cross-entropy classification problem, directly updating the model weights to increase the probability of $y_w$ and decrease the probability of $y_l$.
+- **DPO (Direct Preference Optimization):** The modern engineering baseline. DPO mathematically proves that the language model _itself_ can act as the reward model. It treats alignment as a simple binary cross-entropy classification problem, directly updating the model weights to increase the probability of $y_w$ and decrease the probability of $y_l$.
+- **Modern Optimization Variants (SimPO, ORPO, GRPO):**
+  - **SimPO (Simple Preference Optimization)**: Bypasses the reference model completely by optimizing a length-normalized margin, saving memory and compute.
+  - **ORPO (Odds Ratio Preference Optimization)**: Integrates preference alignment directly into the supervised fine-tuning (SFT) phase, eliminating the need for a separate alignment step.
+  - **GRPO (Group Relative Policy Optimization)**: Replaces individual reward modeling by calculating relative rewards within a group of model-generated outputs. Utilized as the key alignment mechanism for reasoning models like **DeepSeek-R1**.
 
 ### 3. Theoretical Foundations (Only What’s Needed)
 

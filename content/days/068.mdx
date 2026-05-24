@@ -11,7 +11,7 @@ date: "2026-03-10"
 
 ### Abstract
 
-Autonomous agents are fundamentally non-deterministic `while(true)` loops executing over metered, high-cost APIs. Without rigorous, LLM-native observability, these systems are prone to "The Infinite Spend"—a failure mode where an agent encounters an error, attempts the exact same action to resolve it, receives the exact same error, and loops indefinitely until the cloud account is drained. This artifact establishes the engineering requirements for Agent Observability, detailing how to implement call graph tracing, step-level token FinOps, and deterministic "Watchdog" circuit breakers to guarantee operational bounds.
+Autonomous agents are fundamentally non-deterministic `while(true)` loops executing over metered, high-cost APIs. Without rigorous, LLM-native observability engines—such as **Langfuse**, **Arize Phoenix**, or **LangSmith**—these systems are prone to "The Infinite Spend"—a failure mode where an agent encounters an error, attempts the exact same action to resolve it, receives the exact same error, and loops indefinitely until the cloud account is drained. This artifact establishes the engineering requirements for Agent Observability, detailing how to implement call graph tracing, step-level token FinOps, and deterministic "Watchdog" circuit breakers to guarantee operational bounds.
 
 ---
 
@@ -160,7 +160,7 @@ except CircuitBreakerException as e:
 ### 9. Common Pitfalls & Misconceptions
 
 - **Misconception:** Standard APM tools (Datadog, New Relic) work perfectly out-of-the-box for LLMs.
-- _Correction:_ Standard APMs track compute CPU/RAM and network latency. They do not natively understand "Tokens" or "Context Windows." You must either use LLM-native tools (Phoenix, LangSmith, Braintrust) or explicitly emit custom token metrics to your existing APM.
+- _Correction:_ Standard APMs track compute CPU/RAM and network latency. They do not natively understand "Tokens" or "Context Windows." You must either use LLM-native tools (**Langfuse**, **Arize Phoenix**, or **LangSmith**) or explicitly emit custom token metrics to your existing APM.
 
 - **Pitfall:** Alerting on simple errors. Agents are _expected_ to encounter tool errors and recover from them via ReAct loops. Paging an on-call engineer because an agent hit a `400 Bad Request` creates alert fatigue. Alert _only_ when the circuit breaker trips, indicating the agent failed to recover.
 - **Pitfall:** Hash mismatch on floating point arguments. If an agent loops but alters a float parameter slightly (e.g., `{"temp": 0.50}` vs `{"temp": 0.50001}`), a strict SHA-256 hash won't catch it. _Fix:_ Normalize or round numeric inputs before hashing in the Watchdog.

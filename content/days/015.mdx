@@ -2,7 +2,7 @@
 title: "The Generative Shift: LLMs, APIs, and Unit Economics"
 subtitle: "Architectural Mismatch & Cost Blowout"
 day: "015"
-tags: ["OpenAI API", "Tokenization", "FinOps", "Prompt Injection", "GPT-4"]
+tags: ["OpenAI API", "Tokenization", "FinOps", "Prompt Injection", "GPT-4", "Claude 3.7", "Gemini 2.5"]
 date: "2026-01-15"
 ---
 
@@ -16,7 +16,7 @@ We have spent the last 14 days engineering systems that _predict_ (classifiers, 
 
 The primary failure mode for engineers transitioning to GenAI is **treating LLMs like standard software libraries.**
 
-- **The Cost Trap:** A standard API call (e.g., getting the weather) costs effectively zero. An LLM API call can cost $0.03 to $0.30 depending on complexity. A `while(true)` loop in GenAI is a bankruptcy vector.
+- **The Cost Trap:** A standard API call (e.g., getting the weather) costs effectively zero. An LLM API call can cost $0.002 to $0.15 depending on complexity (frontier models like GPT-4o, Gemini 2.5 Pro, and Claude 3.7 Sonnet are priced per million tokens, representing a massive shift in unit economics). A `while(true)` loop in GenAI is a bankruptcy vector.
 - **The Determinism Trap:** Standard software is deterministic (). LLMs are probabilistic. They will give different answers to the same question unless strictly controlled.
 - **The Security Trap:** In traditional software, code and data are separate. In LLMs, the instruction ("Summarize this") and the data ("The text to summarize") share the same input channel. This opens the door to **Prompt Injection**.
 
@@ -86,8 +86,10 @@ import tiktoken
 
 # Pricing Table (Hypothetical Production Rates per 1k tokens)
 PRICING = {
-    "gpt-4o": {"input": 0.005, "output": 0.015},
-    "gpt-4o-mini": {"input": 0.00015, "output": 0.0006}
+    "gpt-4o": {"input": 5.0, "output": 15.0}, // per million tokens
+    "gpt-4o-mini": {"input": 0.15, "output": 0.6}, // per million tokens
+    "claude-3-7-sonnet": {"input": 3.0, "output": 15.0}, // per million tokens
+    "gemini-2-5-pro": {"input": 1.25, "output": 5.0}
 }
 
 def calculate_max_output(model_name, text, budget_limit):
@@ -179,13 +181,14 @@ If your application blindly passes this to the LLM, the LLM might comply.
 
 **Model Selection Strategy:**
 
-- **GPT-4o (The "PhD"):** Use for complex reasoning, coding, and nuance. High cost.
+- **GPT-4o / Claude 3.7 Sonnet / Gemini 2.5 Pro (The "PhD" Tier):** Use for complex reasoning, coding, and nuance. High cost but extremely capable.
+- **Claude 3.7 Extended Thinking / o3 / o4-mini (The "System 2" Tier):** For tasks requiring deep, multi-step logical deduction.
 - **GPT-4o-mini (The "Intern"):** Use for summarization, classification, and extraction. Very low cost.
 
 **The "Smarter vs. Cheaper" Trade-off:**
-Using GPT-4 for simple classification is burning money. Always start with the smallest model that works.
+Using GPT-4o for simple classification is burning money. Always start with the smallest model that works (such as GPT-4o-mini, Gemini 2.5 Flash, or Llama 3.3 8B).
 
-- _Strategy:_ Use GPT-4 to _generate_ training data, then fine-tune a smaller model (like Llama 3 or 4o-mini) to do the task cheaply.
+- _Strategy:_ Use GPT-4o to _generate_ training data (Knowledge Distillation), then fine-tune a smaller model (like Llama 3.3 8B or Phi-4) to do the task cheaply and privately.
 
 ---
 

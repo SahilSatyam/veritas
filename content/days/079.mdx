@@ -56,7 +56,7 @@ If your expected token volume $V \ll V_{break\_even}$, self-hosting is financial
 A production-grade organization follows a strict, escalating decision path:
 
 1. **Phase 1: Buy (SaaS API + Prompt Engineering / RAG):** Always start here. Use frontier APIs (OpenAI, Anthropic, Google) to validate Product-Market Fit. Validate the UX. Prove that the feature actually generates business value.
-2. **Phase 2: Fine-Tune (API-based or PEFT):** If the baseline API struggles with your specific domain syntax (e.g., esoteric legal formatting or proprietary code languages), utilize API-based fine-tuning or Lightweight LoRA adapters. Do not abandon the managed infrastructure yet.
+2. **Phase 2: Fine-Tune (API-based or PEFT):** If the baseline API struggles with your specific domain syntax (e.g., esoteric legal formatting or proprietary code languages), utilize managed APIs like **OpenAI's Fine-Tuning API** (now supporting frontier models like **GPT-4o**), or high-performance third-party fine-tuning and inference platforms like **Together AI** or **Fireworks AI** to train and serve LoRA adapters efficiently without abandoning managed scaling infrastructure.
 3. **Phase 3: Self-Host (Open-Weights on Cloud Compute):** Escalate to self-hosting a model (e.g., vLLM serving Llama-3 on AWS SageMaker) _only_ when token volume crosses the mathematical break-even point, or if data privacy regulations explicitly prohibit routing data to third-party sub-processors.
 4. **Phase 4: Build (Pre-training from Scratch):** Almost never. Unless your business model is selling foundation models, or you possess massive multimodal data fundamentally absent from public training sets, do not pre-train.
 
