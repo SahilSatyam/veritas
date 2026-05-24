@@ -18,6 +18,7 @@ The primary failure mode here is **misuse due to ambiguity**.
 - **The "Silent Failure":** A team deploys your text summarizer to summarize medical records. The model works "fine" (no errors thrown), but it hallucinates dosage instructions because it wasn't trained on clinical data.
 - **The "Bus Factor":** If the engineer who trained the model leaves, the organization loses the knowledge of _why_ certain hyperparameters were chosen or _what_ biases exist in the training set.
 - **Regulatory Audits:** When regulators (like the FDA for MedTech or auditors for Fintech) knock, they don't look at Python scripts first; they look at your design controls and documentation.
+- **Legal Mandate:** Under the **EU AI Act** (entered into force August 2024), Model Cards are no longer a voluntary best practice for high-risk AI systems — they are a **compliance requirement**. High-risk AI providers must supply technical documentation that includes the model's intended purpose, performance metrics, known limitations, and bias evaluations. The high-risk rules apply from August 2026; preparation must begin now.
 
 **The Rule:** If you cannot explain the model's limitations, you cannot deploy the model.
 
@@ -144,6 +145,9 @@ Documentation must be **versioned with the code**. Do not write Model Cards in G
 **Defensibility:**
 In a lawsuit regarding a discriminatory loan decision, a well-maintained Model Card is Exhibit A. It proves you exercised **Due Care**. It shows you knew the limitations and engineered safeguards around them.
 
+**Regulatory Compliance:**
+For teams building high-risk AI systems under the EU AI Act, comprehensive technical documentation (equivalent to a thorough Model Card) is a **legal prerequisite** for market placement. The EU AI Act's high-risk provisions take full effect in August 2026. Organizations without documentation infrastructure in place today will face compliance emergencies at launch.
+
 **Vendor Management:**
 If you are _buying_ AI from a vendor, demand a Model Card. If they cannot provide one, they likely do not understand their own product's risks.
 
@@ -208,3 +212,4 @@ def generate_model_card(model, metrics, version):
 - **Paper:** Mitchell et al. (2019). _Model Cards for Model Reporting._
 - **Tool:** [Hugging Face Model Card Boilerplate](https://huggingface.co/docs/hub/model-cards).
 - **Standard:** [ISO/IEC 42001](https://www.iso.org/standard/81230.html) (AI Management Systems).
+- **Regulation:** [EU AI Act Annex IV](https://artificialintelligenceact.eu/annex/4/) (Technical Documentation Requirements for High-Risk AI — the mandatory successor to voluntary Model Cards).

@@ -74,7 +74,7 @@ The feasible set `C` is defined by domain logic:
 
 ### 4. Production-Grade Implementation
 
-We will use **DiCE (Diverse Counterfactual Explanations)** or **Alibi**, but wrapped in a strict validation layer. Raw library outputs are often dangerous (e.g., suggesting "Change Gender").
+We will use **DiCE (Diverse Counterfactual Explanations)**, **CARLA (Counterfactual And Recourse Library)**, or **Alibi**, but wrapped in a strict validation layer. Raw library outputs are often dangerous (e.g., suggesting "Change Gender"). CARLA is a particularly modern choice as it provides a unified interface across multiple counterfactual methods and datasets, making it easy to swap algorithms without rewriting the constraint layer.
 
 **Architecture: The Recourse Microservice**
 
@@ -252,6 +252,7 @@ Counterfactuals tell users _what to change_, but they still trust the model's st
 ### 10. Further Reading & Resources
 
 - **Library:** [Microsoft/DiCE](https://github.com/interpretml/DiCE) – Diverse Counterfactual Explanations.
+- **Library:** [CARLA](https://github.com/carla-recourse/CARLA) – Counterfactual And Recourse Library; a benchmarking framework providing a unified API across many CF methods.
 - **Library:** [SeldonIO/alibi](https://github.com/SeldonIO/alibi) – Algorithms for inspection and explanation.
 - **Paper:** "Counterfactual Explanations without Opening the Black Box: Automated Decisions and the GDPR" (Wachter et al., 2017).
 - **Concept:** Visualizing how minimum edit distance finds the path across the decision boundary.

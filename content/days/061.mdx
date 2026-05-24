@@ -55,6 +55,9 @@ While JSON is the industry standard for API payloads, it is notoriously brittle 
 ReAct requires multiple serial network calls to the LLM provider. This introduces massive latency compared to one-shot execution.
 _The Resolution:_ In production, you accept the latency tax. The cost of a user waiting 4 seconds for a deterministic, verified answer is exponentially lower than the cost of a hallucinated database write executed in 800 milliseconds. Optimize latency through caching deterministic tool outputs, but do not compromise the loop structure.
 
+**Production Frameworks Implementing ReAct:**
+For teams moving beyond hand-rolled loops, **LangGraph** (by LangChain) has emerged as the dominant production framework for implementing ReAct with explicit state machines. It models the Thought-Action-Observation cycle as a directed graph with typed state, enabling durable execution, built-in checkpointing, and native human-in-the-loop interrupts. For teams wanting a fully managed alternative, the **OpenAI Assistants API** provides a hosted agent runtime with built-in tool calling, thread persistence, and file handling—at the cost of reduced control over execution internals.
+
 ### 5. Hands-On Project / Exercise
 
 **Constraint:** Build a raw ReAct loop from scratch in Python to solve a multi-step math problem using a deterministic `calculator` tool. Do not use LangChain, LlamaIndex, or any other agentic framework.
@@ -153,7 +156,7 @@ Task: {task}
 ### 9. Common Pitfalls & Misconceptions
 
 - **The Infinite Loop:** Agents can get stuck repeatedly calling the same tool with the same inputs if the observation doesn't satisfy their underlying goal. _Fix:_ Always implement a hard `max_steps` limit.
-- **Treating LangChain as Magic:** Relying on `initialize_agent` abstracts away the context window. When it fails, you won't know if it's a parsing error, a context overflow, or a hallucinated tool. Build the raw loop once so you understand the plumbing.
+- **Treating Frameworks as Magic:** High-level frameworks like LangGraph abstract away the context window management. When they fail, you won't know if it's a parsing error, a context overflow, or a hallucinated tool. Build the raw loop once—as this exercise demands—so you understand the plumbing before adopting a managed abstraction.
 - **Forgetting the Stop Sequence:** If you forget to pass `Observation:` to the inference engine's stop parameter, the agent will talk to itself, fake the tool outputs, and complete the task purely in its imagination.
 
 ### 10. Prerequisites & Next Steps

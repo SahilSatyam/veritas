@@ -143,6 +143,7 @@ Run both prompts against a confusing transcript where someone says, _"I guess I 
 
 - **Portability:** A well-structured RTF prompt is easier to port between models. If you switch from OpenAI to Anthropic, the `Role` and `Format` sections usually translate 1:1. "Magic spell" prompts often break across providers.
 - **Cost Control:** A precise output format (JSON) prevents the model from rambling. Getting a 50-token JSON list is cheaper than a 300-token conversational paragraph.
+- **System Prompt Caching:** Anthropic's Prompt Caching feature (and similar mechanisms on other platforms) allows you to mark your large `System Prompt` as a cacheable prefix. Subsequent API calls that reuse the same system prompt hit the cache, reducing both latency and cost by up to 90% on the cached portion. This makes the RTF pattern doubly valuable: a well-structured, stable system prompt is also an optimal caching target. Mark it with `cache_control: {"type": "ephemeral"}` in the Anthropic SDK.
 
 ### 8. Code Examples: The Template
 

@@ -50,7 +50,12 @@ Sandboxing relies on boundary enforcement at the operating system or hypervisor 
 Heavy virtualization (like traditional EC2 instances) provides great security but takes minutes to boot, making synchronous agentic loops impossibly slow. Docker containers start in milliseconds but carry kernel-sharing risks (container escape vulnerabilities).
 
 _The Resolution:_ For single-tenant applications executing trusted internal data, a heavily locked-down Docker container (dropping all capabilities, read-only root filesystem, no network) is acceptable to maintain sub-second latency.
-However, for multi-tenant, user-facing agentic platforms, **Docker is insufficient**. You must use MicroVMs (Firecracker) or managed execution APIs (like E2B). MicroVMs boot in ~150ms, resolving the latency trade-off while providing hardware-level security guarantees.
+However, for multi-tenant, user-facing agentic platforms, **Docker is insufficient**. You must use MicroVMs (Firecracker) or managed execution APIs. Two options dominate production deployments today:
+
+1. **Firecracker MicroVMs (self-hosted):** Boot in ~150ms with hardware-level kernel isolation. This is the technology powering AWS Lambda. Run with KVM on Linux hosts.
+2. **E2B.dev (managed cloud sandboxes):** A purpose-built cloud sandbox platform designed specifically for AI agent code execution. It provides an SDK that lets your agent spin up an isolated, networked (or air-gapped) Python/Node environment, upload files, execute code, and retrieve output—all over a simple API. E2B handles the Firecracker VM lifecycle for you and provides per-sandbox resource limits and audit logs. This is the fastest path to production-safe code execution for most teams.
+
+Both options resolve the latency trade-off while providing hardware-level security guarantees.
 
 Furthermore, **Network Isolation is non-negotiable**. The sandbox must be instantiated with loopback access only. If the agent needs to download a dataset, the _host_ downloads it, sanitizes it, and mounts it to the sandbox. The sandbox itself cannot `curl` the outside world.
 
@@ -82,7 +87,7 @@ By offloading execution to specialized MicroVM infrastructure (either internally
 
 ### 8. Code Examples / Pseudocode
 
-This example demonstrates how to wrap a standard Docker container into a hardened, ephemeral sandbox using Python's `subprocess` module.
+This example demonstrates how to wrap a standard Docker container into a hardened, ephemeral sandbox using Python's `subprocess` module. For teams using E2B, the equivalent is shown in the commented block below.
 
 ```python
 import subprocess
@@ -181,6 +186,19 @@ while True:
 # print(execute_sandboxed_code(hostile_fs))
 # -> Fails safely due to pids-limit and user privileges.
 
+```python
+# --- E2B.dev alternative (managed cloud sandbox) ---
+# from e2b_code_interpreter import Sandbox
+#
+# def execute_sandboxed_code_e2b(llm_generated_code: str) -> str:
+#     with Sandbox() as sandbox:  # Ephemeral: auto-destroyed on context exit
+#         execution = sandbox.run_code(llm_generated_code)
+#         if execution.error:
+#             return f"Execution Failed:\n{execution.error.traceback}"
+#         return f"Success:\n{''.join([r.text for r in execution.results])}"
+#
+# E2B handles the Firecracker VM lifecycle, resource limits, and network isolation.
+# Network access can be enabled per-sandbox for specific tasks.
 ```
 
 ### 9. Common Pitfalls & Misconceptions
@@ -198,5 +216,5 @@ while True:
 ### 11. Further Reading & Resources
 
 - **Firecracker MicroVMs:** AWS Open Source whitepaper on lightweight virtualization for serverless computing.
-- **E2B (English2Bits):** Documentation on managed, secure sandbox environments tailored for AI agents.
+- **E2B.dev:** Documentation on the `e2b-code-interpreter` SDK—the purpose-built, AI-native managed sandbox used in production by agent frameworks. Provides per-sandbox isolation, streaming output, and a clean Python/TypeScript API.
 - **Docker Security Best Practices:** Official documentation on dropping capabilities and preventing privilege escalation.

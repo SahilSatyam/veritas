@@ -42,7 +42,7 @@ If the transition function relies solely on the LLM's semantic output (e.g., `if
 
 ### 4. Production-Grade Implementation
 
-Modern orchestration frameworks like LangGraph and AutoGen have converged on graph-based state management. A production-grade implementation requires three components:
+Modern orchestration frameworks have converged on graph-based state management. **LangGraph** (by LangChain) is the primary production implementation of this pattern—it natively models agent workflows as directed, stateful graphs with first-class support for cycles, conditional edges, and durable checkpointing. Microsoft **AutoGen 0.4** offers an alternative via its `GroupChat` pattern, which routes turns between agents using a programmable `GroupChatManager` and enforces hard speaker-selection limits. A production-grade implementation requires three components:
 
 1. **Strict State Schema:** A typed object defining exactly what data moves between agents. Crucially, this schema must include execution metadata (e.g., `revision_count: int`).
 2. **Stateless Nodes:** Agents do not remember the conversation. They are pure functions that take the current `State` as input, invoke an LLM, and return a `StateUpdate`.
@@ -115,10 +115,13 @@ def reviewer_node(state: GraphState) -> dict:
     status, feedback = invoke_llm_reviewer(state["draft"])
     return {"status": status, "feedback": feedback}
 
-# System orchestration (Conceptual LangGraph setup)
-# graph.add_node("researcher", researcher_node)
-# graph.add_node("reviewer", reviewer_node)
-# graph.add_conditional_edges("reviewer", router)
+# System orchestration (LangGraph — production implementation)
+# from langgraph.graph import StateGraph, END
+# workflow = StateGraph(GraphState)
+# workflow.add_node("researcher", researcher_node)
+# workflow.add_node("reviewer", reviewer_node)
+# workflow.add_conditional_edges("reviewer", router, {"researcher": "researcher", "end": END, "human_escalation": "human_escalation"})
+# graph = workflow.compile()
 
 ```
 
@@ -135,6 +138,7 @@ def reviewer_node(state: GraphState) -> dict:
 
 ### 11. Further Reading & Resources
 
-- LangGraph Documentation: Multi-Agent Workflows
+- LangGraph Documentation: Multi-Agent Workflows and Stateful Graphs.
+- Microsoft AutoGen 0.4 Documentation: `GroupChat` and `GroupChatManager` patterns.
 - ISO/IEC 23894:2023 - Information technology — Artificial intelligence — Risk management.
 - _Agentic Design Patterns_ (Stanford AI Lab publications on deterministic control of probabilistic systems).

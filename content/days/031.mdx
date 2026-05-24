@@ -45,6 +45,10 @@ Don't choose one. Run both.
 A standard embedding model (Bi-Encoder) calculates the query vector and document vector _independently_. This is fast but loses nuance (like negation).
 A **Cross-Encoder** takes the query and document _together_ as a single input pair: `[CLS] Query [SEP] Document`. It performs deep self-attention on the interaction between words. It is highly accurate but computationally expensive.
 
+#### Late Interaction Models (ColBERT v2)
+
+**ColBERT v2** offers a compelling middle ground between Bi-Encoders and Cross-Encoders. Instead of producing a single vector per document, ColBERT produces a matrix of token-level embeddings. At query time, it performs a cheap "MaxSim" operation across token vectors, capturing token-level interactions at near-Bi-Encoder speed. ColBERT v2 is now a production-grade choice for scenarios where Cross-Encoder latency is prohibitive but Bi-Encoder precision is insufficient.
+
 ### 3. Required Trade-offs to Surface
 
 | Strategy                                | Speed  | Precision (Nuance)                    | Cost                  |
@@ -100,6 +104,8 @@ retrieved_docs = documents
 #### Step 2: The Re-ranking Step
 
 We use a Cross-Encoder trained on MS MARCO (search data). Unlike embeddings, this model outputs a relevance score (0-1) for the pair.
+
+> **Production Note**: For cloud deployments, **Cohere Rerank v3** is the dominant managed reranker API. It accepts your candidate list and returns re-ranked results without running inference locally. This removes the GPU dependency entirely and makes the re-ranking step infrastructure-free.
 
 ```python
 # Load a lightweight Cross-Encoder
@@ -171,7 +177,7 @@ def reciprocal_rank_fusion(list_a_ranks, list_b_ranks, k=60):
 
 1. **Audit:** Review your current retrieval. Are you losing precision on keyword-heavy queries (product SKUs, error codes)?
 2. **Implement:** Add BM25 (Sparse) alongside your Vector Search (Dense) and use RRF to merge.
-3. **Upgrade:** If precision is still low, deploy a dedicated Cross-Encoder service (e.g., a small Docker container running HuggingFace Inference).
+3. **Upgrade:** If precision is still low, choose one of three paths: deploy a self-hosted Cross-Encoder service (e.g., a Docker container running HuggingFace Inference), call the **Cohere Rerank v3** managed API for zero-infrastructure re-ranking, or adopt **ColBERT v2** for sub-Cross-Encoder latency with superior token-level precision.
 
 ### Coming Up Next
 

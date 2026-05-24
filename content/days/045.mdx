@@ -184,6 +184,54 @@ if not results["success"]:
     raise ValueError("Data Quality Check Failed!")
 ```
 
+**Soda Core (Modern Alternative)**
+Soda Core is a lightweight, code-first data quality framework that integrates naturally with modern data stacks and supports YAML-defined checks:
+
+```yaml
+# soda_checks.yml
+checks for customer_data:
+  - missing_count(region) < 1%:
+      name: Region null rate under 1%
+  - min(age) >= 0:
+      name: Age is non-negative
+  - max(age) <= 120:
+      name: Age is plausible
+  - row_count > 0:
+      name: Dataset is not empty
+```
+
+```python
+# Run from Python or CI pipeline
+# soda scan -d my_datasource -c soda_checks.yml
+# Exit code 1 on failure — integrates cleanly with Airflow/GitHub Actions
+```
+
+**dbt Tests (Data Stack Integration)**
+If your data flows through **dbt** (which it should in any modern analytics stack), dbt's native test layer is often the _first_ line of defense:
+
+```yaml
+# models/schema.yml
+models:
+  - name: customer_data
+    columns:
+      - name: age
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+              max_value: 120
+      - name: purchase_amount
+        tests:
+          - not_null
+          - dbt_utils.accepted_range:
+              min_value: 0
+      - name: region
+        tests:
+          - not_null
+```
+
+Run with `dbt test`. Tests are version-controlled alongside transformation logic, keeping data quality assertions close to the transformations that produce the data.
+
 ### 9. Common Pitfalls & Misconceptions
 
 - **Over-Strict Schemas:** If you validate that `description` must always be &lt; 140 characters, and marketing changes it to 280, your pipeline breaks unnecessarily. Use "Warning" levels for non-critical changes and "Failure" levels for critical ones (like negative price).
@@ -202,6 +250,8 @@ Take your most fragile pipeline. Add a simple check: "Does the row count match y
 
 ### 11. Further Reading & Resources
 
-- **Pandera Documentation:** Excellent for Python-centric validation.
-- **Great Expectations:** The industry standard for data testing.
+- **Pandera Documentation:** Excellent for Python-centric validation with tight pandas integration.
+- **Great Expectations:** The industry standard for data testing with a rich ecosystem of connectors and a data documentation UI.
+- **Soda Core:** A modern, lightweight open-source framework for data quality checks. YAML-first, CI-friendly, and integrates cleanly with dbt and Airflow. A strong alternative when GX feels heavyweight.
+- **dbt Tests:** If your team uses dbt, its built-in test layer (`not_null`, `unique`, `accepted_values`, `relationships`, and custom `dbt_utils` tests) is the most natural place to add data quality contracts—co-located with the transformations that produce the data.
 - **"Data Contracts" by Chad Sanderson:** Essential reading on the organizational shift toward treating data as a product.

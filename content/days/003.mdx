@@ -22,6 +22,8 @@ Python environments (Day 1) isolate Python libraries, but they rely on the under
 - **Scalability**: You cannot auto-scale a "pet" server that was manually configured. You can spin up 1,000 containers in seconds.
 - **System-Wide Implication**: The "Unit of Deployment" is no longer a code file; it is a **Container Image**. This image includes the OS, the code, the data pointers, and the configuration schema.
 
+> **Tooling Note (2025+):** **Docker** remains the dominant standard, but **Podman** (from Red Hat) has emerged as a compelling rootless, daemonless alternative. Podman is fully OCI-compatible and largely Docker-CLI-compatible (`alias docker=podman`), but runs without a root-level daemon — a superior security posture for production AI workloads.
+
 ## 2. Core Concepts & Mental Models
 
 ### The "Shipping Container" Metaphor
@@ -67,6 +69,8 @@ Docker is not virtualization (like a VM). It uses Linux kernel features:
 ### The "Secure By Design" Dockerfile
 
 We do not run as `root` inside the container. If an attacker escapes the application, they would have root privileges on the container (and potentially the host).
+
+> **Rootless Alternative:** With **Podman**, containers run rootless by default — even the container daemon itself runs as a non-root user. This provides defense-in-depth: if the container process is compromised, the attacker gains no host privileges. The Dockerfile format is identical; just replace `docker` with `podman` in all commands.
 
 ```dockerfile
 # 1. Base Image (Pin the minor version)
@@ -234,4 +238,5 @@ SUCCESS: Model_V1 is running on secure port.
 
 - **Deep Dive**: _Best Practices for Writing Dockerfiles_ (Official Docker Docs).
 - **Security**: _OWASP Docker Security Cheat Sheet_.
+- **Rootless Alternative**: _Podman Documentation_ (docs.podman.io) - Daemonless, rootless container engine; drop-in Docker replacement with superior default security.
 - **Tooling**: _Hadolint_ - A linter for Dockerfiles that catches bad practices automatically.

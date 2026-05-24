@@ -199,6 +199,7 @@ Re-weighting fixes the _model_, not the _world_. If Group B has lower credit sco
 1. **Metric Alignment:** Engineering teams optimize for `Loss` (MSE/LogLoss). Legal teams optimize for `Compliance`. Re-weighting aligns these by embedding compliance _into_ the loss function via weights.
 2. **Feature Investment:** If re-weighting drops accuracy too much, it signals that your features are weak for the minority group. The strategic fix is not "better algorithms," but "better data acquisition" for that segment.
 3. **A/B Testing:** Never roll out a mitigated model 100% immediately. A/B test to ensure the "Fairness" didn't introduce unexpected behavioral anomalies (e.g., massive increase in default rates).
+4. **Documentation Governance:** Pair bias mitigation with Google's **Model Cards for Model Reporting** standard. A Model Card that explicitly documents the mitigation technique applied, the groups tested, and the resulting disparity ratios turns your re-weighting work into auditable, shareable governance evidence—a complementary layer to the technical mitigation itself.
 
 ### 8. Common Pitfalls & Misconceptions
 
@@ -230,4 +231,5 @@ A mitigated model with no documentation is still a compliance risk. The next ste
 
 - **Paper:** "A Reductions Approach to Fair Classification" (Agarwal et al., 2018).
 - **Library:** `sklearn.utils.class_weight` and `fairlearn.reductions`.
+- **Standard:** Google's [Model Cards for Model Reporting](https://modelcards.withgoogle.com/about) (Mitchell et al., 2019) – Provides the governance documentation template for recording bias mitigation outcomes; widely adopted as a complementary artifact to technical mitigation.
 - **Concept:** Visualizing how re-weighting shifts the decision boundary away from the minority group's cluster.

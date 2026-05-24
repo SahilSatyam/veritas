@@ -71,6 +71,11 @@ Calculating exact Shapley values is NP-hard. TreeExplainer (for XGBoost/LightGBM
 - **Design Pattern:** Do not compute SHAP values in the synchronous API request path (blocking) if latency is critical (&lt;100ms).
 - **Solution:** Compute prediction in real-time. Offload SHAP calculation to an asynchronous worker or compute it only when the user requests "Why?".
 
+**Expanding the Toolkit (Beyond SHAP):**
+
+- **Captum (PyTorch-native):** If your model is a neural network built in PyTorch, Captum provides integrated gradients, layer attribution, and TCAV — all natively inside the PyTorch ecosystem without the model-agnostic overhead of SHAP's KernelExplainer.
+- **MAGE (Model-Agnostic Global Explanations):** A newer framework for counterfactual and contrastive explanations, particularly useful for non-tree-based models where "what would need to change for a different outcome" is more actionable than a raw importance score.
+
 **Audience-Aware Visualization:**
 
 - **For Data Scientists:** Beeswarm plots showing feature distributions and non-linearities.
@@ -233,3 +238,5 @@ def get_decision_with_explanation(user_features):
 - **Paper:** Lundberg & Lee (2017). _A Unified Approach to Interpreting Model Predictions_ (The SHAP paper).
 - **Book:** Christoph Molnar. _Interpretable Machine Learning_ (The industry bible for XAI).
 - **Library:** [SHAP (GitHub)](https://github.com/slundberg/shap)
+- **Library:** [Captum](https://captum.ai/) (PyTorch-native interpretability — integrated gradients, layer attribution, TCAV).
+- **Library:** [LIME (GitHub)](https://github.com/marcotcr/lime) (Local Interpretable Model-agnostic Explanations — still useful for quick local approximations).

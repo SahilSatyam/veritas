@@ -62,7 +62,7 @@ We move beyond `requirements.txt`. While common, it is insufficient for high-sta
 ### Recommended Stack
 
 - **Environment Management**: `pyenv` (for managing Python versions) + `venv` (for isolation).
-- **Dependency Resolution**: `poetry` or `uv` (modern, faster). These tools generate a lock file (`poetry.lock` or `uv.lock`).
+- **Dependency Resolution**: `uv` (now the dominant choice — an extremely fast Rust-based package manager and resolver, generating `uv.lock`) or `poetry` (mature, widely adopted, generating `poetry.lock`). Both produce a lock file that serves as the contract.
 
 ### The Lock File Contract
 
@@ -123,9 +123,29 @@ numpy
 
 ### Step 2: The "Robust" Setup (The Solution)
 
-We will use `poetry` (or `pip-tools`) to generate a lock file.
+We will use `uv` (or `poetry`) to generate a lock file.
 
-**Initialize Project**:
+**Option A — uv (recommended, fastest)**:
+
+```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Initialize project and add dependencies
+uv init responsible-ai-day1
+cd responsible-ai-day1
+uv add scikit-learn numpy
+```
+
+**Generate Lock File**:
+
+```bash
+uv lock
+# This generates uv.lock. OPEN IT. Look at the hashes.
+# This file guarantees that 'numpy' is locked to the specific version and hash.
+```
+
+**Option B — Poetry (mature alternative)**:
 
 ```bash
 # Install Poetry (if not present)
@@ -133,14 +153,7 @@ curl -sSL https://install.python-poetry.org | python3 -
 
 # Initialize
 poetry init --name="responsible-ai-day1" --dependency=scikit-learn --dependency=numpy
-```
-
-**Generate Lock File**:
-
-```bash
 poetry lock
-# This generates poetry.lock. OPEN IT. Look at the hashes.
-# This file guarantees that 'numpy' is locked to the specific version and hash.
 ```
 
 ### Step 3: The Verification Script
@@ -150,13 +163,18 @@ Write a script `verify_env.py` that fails if the environment hash doesn't match 
 ```python
 import sys
 import hashlib
-import pkg_resources
+from importlib.metadata import packages_distributions, version
 
 def generate_env_signature():
     """Generates a unique hash of the installed packages and their versions."""
-    installed_packages = sorted(
-        [f"{i.key}=={i.version}" for i in pkg_resources.working_set]
-    )
+    # importlib.metadata is the stdlib replacement for the deprecated pkg_resources
+    pkg_names = sorted(packages_distributions().keys())
+    installed_packages = []
+    for pkg in pkg_names:
+        try:
+            installed_packages.append(f"{pkg}=={version(pkg)}")
+        except Exception:
+            pass
     env_string = "".join(installed_packages)
     return hashlib.sha256(env_string.encode('utf-8')).hexdigest()
 
@@ -189,9 +207,9 @@ if __name__ == "__main__":
 
 ## 7. Business & Strategic Implications
 
-- **ROI on Onboarding**: Strict environments mean a new engineer can clone the repo and run `poetry install`, and be productive in 5 minutes. No "debugging setup" for 2 days.
+- **ROI on Onboarding**: Strict environments mean a new engineer can clone the repo and run `uv sync` (or `poetry install`), and be productive in 5 minutes. No "debugging setup" for 2 days.
 - **Risk Mitigation**: Prevents "It worked in staging" outages, protecting SLA (Service Level Agreements) and reputation.
-- **Vendor Lock-in**: Using standard tools like `poetry` or `conda` prevents lock-in to proprietary ML platforms for basic environment management.
+- **Vendor Lock-in**: Using standard tools like `uv`, `poetry`, or `conda` prevents lock-in to proprietary ML platforms for basic environment management.
 
 ## 8. Common Pitfalls & Misconceptions
 
@@ -219,9 +237,9 @@ if __name__ == "__main__":
 
 If your current project uses a `requirements.txt` without hashes:
 
-1.  Install `poetry` or `pip-tools`.
-2.  Generate a lock file.
-3.  Delete your `venv` and reinstall only from the lock file to verify it works.
+1.  Install `uv` (`curl -LsSf https://astral.sh/uv/install.sh | sh`) or `poetry`.
+2.  Generate a lock file (`uv lock` or `poetry lock`).
+3.  Delete your `venv` and reinstall only from the lock file to verify it works (`uv sync` or `poetry install`).
 
 ### Coming Up Next
 

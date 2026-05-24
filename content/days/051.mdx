@@ -73,7 +73,7 @@ In production, we don't manually inspect every neuron. We use **Automated Circui
 
 **Workflow: The "Glass Box" Monitor**
 
-1. **Offline Analysis:** Use Sparse Autoencoders (SAEs) or geometric probes to identify the "Hallucination" or "Uncertainty" directions in the model's latent space.
+1. **Offline Analysis:** Use Sparse Autoencoders (SAEs) or geometric probes to identify the "Hallucination" or "Uncertainty" directions in the model's latent space. Anthropic's **Scaling Monosemanticity** paper (2024) demonstrated that SAE-based feature decomposition scales to frontier models like Claude 3 Sonnet, cataloguing millions of interpretable features—a major milestone proving mech-interp is no longer confined to toy models.
 2. **Runtime Monitor:** During inference, instead of just logging text, we log the _projection_ of the activation onto these danger vectors.
 3. **Intervention:** If `Project(Activation, Danger_Vector) > Threshold`, we apply a **Steering Vector** to dampen the activation _before_ the next layer processes it.
 
@@ -192,7 +192,7 @@ Just because we found a circuit that _looks_ like it does X, doesn't mean it _on
   - _Reality:_ Finding a "sentiment neuron" is rare. Most concepts are distributed across directions (vectors), not single neurons.
 
 - **Pitfall:** Scalability.
-  - _Reality:_ We cannot currently do this for every behavior in GPT-4. This is a surgical tool for critical failures, not a general monitoring tool (yet).
+  - _Reality:_ Circuit analysis was once limited to small models like GPT-2. Anthropic's **Scaling Monosemanticity** (2024) and related SAE work have begun closing this gap for frontier-scale models, but full automated circuit discovery across all behaviors in a 70B+ model remains an active research challenge.
 
 ### 9. Prerequisites & Next Steps
 
@@ -211,7 +211,9 @@ Once you can locate and ablate a circuit, you are ready to ask the next question
 
 ### 10. Further Reading & Resources
 
-- **Library:** [TransformerLens](https://github.com/neelnanda-io/TransformerLens) – The gold standard for this work.
-- **Paper:** "Toy Models of Superposition" (Anthropic).
+- **Library:** [TransformerLens](https://github.com/neelnanda-io/TransformerLens) – Created by Neel Nanda; the gold standard library for mechanistic interpretability of GPT-style models.
+- **Resource:** [Neuronpedia](https://neuronpedia.org) – A public, interactive database of SAE-decoded features from real models; the primary community hub for mech-interp research.
+- **Paper:** "Scaling Monosemanticity: Extracting Interpretable Features from Claude 3 Sonnet" (Anthropic, 2024) – Demonstrates SAE-based circuit analysis at frontier scale.
+- **Paper:** "Toy Models of Superposition" (Anthropic) – The foundational theory of polysemanticity and superposition.
 - **Article:** [Zoom In: An Introduction to Circuits](https://distill.pub/2020/circuits/zoom-in/).
-- **Interactive:** Exploring how heads move information.
+- **Interactive:** Exploring how heads move information via Neuronpedia's circuit visualizer.

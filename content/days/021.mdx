@@ -35,7 +35,14 @@ Do not use vendor SDKs directly in your application logic. Instead, treat LLM pr
 
 ### 3. Required Trade-offs to Surface
 
-| Trade-off                | GPT-5.2 (OpenAI)                                                                                                | Claude Opus 4.5 (Anthropic)                                                                                | Mistral Large 3                                                                              |
+The modern provider landscape is far larger than just OpenAI and Anthropic. Key players include:
+
+- **Google Gemini API** — Gemini 2.5 Pro/Flash, with class-leading 1M-token context and strong multimodal capabilities.
+- **Meta Llama API / Groq / Together AI** — Access to open-weight Llama 3.3 and other open models via managed APIs (Groq is especially notable for ultra-low latency inference).
+- **Mistral AI** — Mistral Large 2 and Mistral Small 3 remain the leaders for EU-sovereign deployments and on-premises fine-tuning.
+- **OpenRouter** — A multi-provider aggregator that exposes a single OpenAI-compatible endpoint for 100+ models. Excellent for rapid cost/performance benchmarking without code changes.
+
+| Trade-off                | GPT-5.2 (OpenAI)                                                                                                | Claude Opus 4.5 (Anthropic)                                                                                | Mistral Large 2                                                                              |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | **Intelligence Profile** | **Split Personality.** You must choose between `Instant` (fast, ~150 t/s) or `Thinking` (slow, high-reasoning). | **Elastic Intelligence.** Single model. You tune the `effort` parameter (1-10) to trade latency for depth. | **Specialist.** Remains the leader for EU-sovereign tasks and fine-tuning on your own infra. |
 | **Context & Retrieval**  | 128k. Strong on "needle-in-haystack" but struggles with massive multi-file coding tasks compared to Opus.       | 500k. The "Context King." Can ingest entire repos (~200 files) with higher recall than GPT.                | 32k - 128k.                                                                                  |
@@ -45,7 +52,10 @@ Do not use vendor SDKs directly in your application logic. Instead, treat LLM pr
 
 - Use **GPT-5.2 Instant** for latency-sensitive, user-facing features (chatbots, UI gen).
 - Use **Claude Opus 4.5 (High Effort)** for background agents, complex refactoring, and asynchronous "Deep Work."
-- Use **Mistral** if data cannot leave your VPC (using the self-hosted weights).
+- Use **Mistral Large 2** if data cannot leave your VPC (using the self-hosted weights).
+- Use **Groq + Llama 3.3** when you need open-weight models at near-real-time latency.
+- Use **Gemini 2.5 Pro** when you need massive context (1M tokens) or multimodal document processing.
+- Use **OpenRouter** to A/B test across providers without changing your integration code.
 
 ### 4. Responsibility Lens: Governance & Data Retention
 
@@ -137,6 +147,11 @@ class LLMGateway:
         self._providers = {
             "openai": OpenAIProvider(os.getenv("OPENAI_API_KEY")),
             "anthropic": AnthropicProvider(os.getenv("ANTHROPIC_API_KEY"))
+            # Additional providers can be registered here:
+            # "gemini": GeminiProvider(os.getenv("GEMINI_API_KEY")),
+            # "groq": GroqProvider(os.getenv("GROQ_API_KEY")),        # Llama 3.3 via Groq
+            # "together": TogetherProvider(os.getenv("TOGETHER_API_KEY")), # Open models
+            # "openrouter": OpenRouterProvider(os.getenv("OPENROUTER_API_KEY")), # Multi-provider aggregator
         }
 
     def chat(self, provider_name: str, reasoning_level: str, user_prompt: str) -> str:
@@ -164,7 +179,7 @@ class LLMGateway:
 
 ### 8. Common Pitfalls
 
-- **Hardcoding `gpt-4`:** A surprising number of 2026 startups still have `model="gpt-4"` hardcoded. This model is now legacy/deprecated and costs more for worse performance than `gpt-5.2-instant`.
+- **Hardcoding `gpt-4`:** A surprising number of 2026 startups still have `model="gpt-4"` hardcoded. This model is now legacy/deprecated and costs more for worse performance than `gpt-5.2-instant`. The same risk applies to hardcoding any specific provider: if Groq raises prices or Together AI changes their open-model offering, your code must not require a rewrite.
 - **Ignoring the `effort` Timeout:** Claude Opus 4.5 on "High Effort" can take 45+ seconds to reply. Standard HTTP timeouts (usually 30s) will kill the connection before the answer arrives. Bump your timeouts to 90s for reasoning models.
 
 ### 9. Next Steps

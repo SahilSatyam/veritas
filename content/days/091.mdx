@@ -1,0 +1,152 @@
+---
+day: "091"
+title: "Edge AI & Mobile LLM Optimization: AWQ, GPTQ, ONNX Runtime, and WebGPU"
+failure: "Device Thermal Throttle"
+lens: "Performance"
+domain: "Edge Deployments"
+status: "published"
+tags: ["Edge AI", "Quantization", "ONNX", "WebGPU", "Mobile LLMs"]
+date: "2026-03-25"
+---
+
+### Abstract
+
+Deploying large language models on cloud infrastructure introduces high operational costs and raises privacy concerns. Porting models directly to edge devices (smartphones, laptops) resolves these issues, but introduces a new set of hardware bottlenecks. Without optimization, edge deployments suffer from the **"Device Thermal Throttle"** failure mode—draining batteries in minutes, heating devices to thermal shutdown, or crashing due to Out-Of-Memory (OOM) errors. This post establishes the production patterns for edge AI optimization. We detail the trade-offs of AWQ vs. GPTQ, explain the mechanics of compiled ONNX execution, and demonstrate how to leverage hardware-accelerated WebGPU in browser environments for low-latency, private inference.
+
+### 1. Why This Topic Matters
+
+The failure mode Day 091 prevents is **"Device Thermal Throttle."** 
+
+When a user runs an unoptimized local model on their phone or laptop, the device's system-on-chip (SoC) runs at peak capacity to process tokens. Within two minutes, the battery temperature spikes, triggering hardware safeguards: the OS aggressively throttles CPU and GPU clock speeds to prevent physical damage. Token generation speed plunges from 30 tokens/second to a crawling 2 tokens/second, rendering the application unusable. In worse cases, the OS's Out-Of-Memory (OOM) killer abruptly terminates the app process because the model weights exceed the platform's strict application memory limits.
+
+Engineering for the edge requires a total shift in mindset: memory bandwidth, rather than compute capacity, is your primary constraint. You must optimize the model's footprint so that it fits comfortably within active application limits while maintaining acceptable perplexity scores.
+
+### 2. Core Concepts & Mental Models
+
+- **Memory Bandwidth Bottleneck:** Unlike server clusters with high-bandwidth memory (HBM), consumer edge devices use shared LPDDR memory, which is significantly slower. LLM generation is auto-regressive, meaning the model weights must be loaded from memory for *every single token generated*. Optimization is the art of minimizing weight transfer.
+- **Quantization (AWQ vs. GPTQ vs. GGUF):** 
+  - **AWQ (Activation-aware Weight Quantization):** Protects the most important "salient" weights (1% of total weights that have high activation magnitudes) from being quantized aggressively, preserving overall model accuracy at 4-bit precision.
+  - **GPTQ:** A calibration-based post-training quantization method that updates the remaining unquantized weights step-by-step using second-order Taylor expansions to compensate for quantization errors.
+  - **GGUF / llama.cpp:** The dominant format for local model execution as of 2025/2026. GGUF files are self-contained, cross-platform model bundles executed by the llama.cpp runtime, enabling CPU-only inference on laptops with optional GPU offloading. ExLlamaV2 is the fastest GGUF-adjacent NVIDIA GPU backend, offering higher throughput than stock llama.cpp on consumer cards.
+- **WebGPU:** A modern W3C standard API that exposes GPU hardware capabilities (particularly Compute Shaders) directly to web browsers, delivering near-native execution speed without compiling desktop binaries.
+- **Apple MLX:** Apple's native machine learning framework for Apple Silicon (M-series chips), designed to exploit the unified CPU/GPU/Neural Engine memory architecture. MLX enables native fp16 / int4 model execution at significantly higher throughput than cross-platform runtimes on Mac hardware.
+- **Qualcomm AI Hub:** Qualcomm's cloud-based model optimization and on-device deployment service for Snapdragon SoC (Android phones and Windows on ARM laptops), enabling hardware-accelerated inference via the Hexagon NPU.
+
+### 3. Theoretical Foundations (Only What’s Needed)
+
+Quantization maps continuous float values (FP16 or FP32) to discrete integers (INT4 or INT8).
+
+$$q = \text{round}\left(\frac{w}{S}\right) + Z$$
+
+Where $S$ is the scale factor, and $Z$ is the zero-point.
+
+Standard rounding causes a massive drop in model reasoning quality at lower precisions. **AWQ** addresses this by recognizing that activations are highly non-uniform; certain features contain critical logic. AWQ scales these salient weight channels by a factor $s \ge 1$ before quantization to reduce distortion:
+
+$$W' = W \cdot \text{diag}(s)$$
+
+This selectively shields the structural paths of the model while allowing the remaining 99% of parameters to be safely compressed to 4 bits, retaining near-FP16 level reasoning performance.
+
+### 4. Production-Grade Implementation
+
+**Explicit Trade-off Resolution: Latency vs. Perplexity**
+- *The Conflict:* Extreme quantization (e.g., down to 2-bit or 3-bit GGUF/AWQ) dramatically increases execution speed and reduces thermal output, but it degrades model comprehension, leading to nonsensical reasoning or semantic failure.
+- *The Resolution:* We establish a strict **Perplexity Budget**. Before deploying a quantized model to edge devices, we measure its perplexity on standard datasets (e.g., WikiText-2). If the quantized model's perplexity increases by more than $0.5$ compared to the FP16 baseline, the model is rejected. For 7B parameter models, 4-bit AWQ with a group size of 128 represents the optimal production sweet spot, maintaining reasoning ability while reducing memory bandwidth by 75%.
+
+### 5. Hands-On Project / Exercise
+
+**Constraint:** Build an in-browser WebGPU execution pipeline that loads a quantized model and measures the generation token throughput (tokens per second) and memory growth over a 100-token sequence.
+
+1. **Setup the Browser Context:** Verify WebGPU adapter support.
+2. **Initialize ONNX Runtime Web:** Load a 4-bit quantized model (e.g., ONNX representation of Llama-3.x-8B-Instruct-4bit-AWQ, or an equivalent GGUF model via a WebAssembly llama.cpp port).
+3. **Execution & Instrumentation:** Track active memory using `performance.memory` and output real-time tokens-per-second statistics.
+
+### 6. Ethical, Security & Safety Considerations
+
+**Lens Applied: Privacy (Zero-Trust Local Execution)**
+
+Deploying models on the edge is the ultimate privacy design pattern. By running inference entirely in the user's browser or device sandbox, sensitive user data (PII, corporate financial figures, personal health queries) never crosses the network.
+
+However, local deployments introduce a new security attack vector: **Model Theft**. Once weights are downloaded to the client's local memory space, they can be extracted by a motivated adversary. Production edge designs must evaluate whether the model's proprietary value outweighs the privacy gains of edge execution.
+
+### 7. Business & Strategic Implications
+
+- **Infinite Scalability at Zero Cost:** With edge execution, the user's local silicon pays the energy and hardware depreciation bills. Your hosting costs drop to simple CDN static file serving fees, transforming your business model's unit economics.
+- **Offline Reliability:** Applications remain fully functional in low-connectivity zones, airplanes, or industrial cleanrooms, creating a massive competitive differentiator.
+
+### 8. Code Examples / Pseudocode
+
+_Initializing ONNX Runtime Web with WebGPU acceleration and measuring real-time token throughput:_
+
+```javascript
+// WebGPU edge execution runtime script
+import * as ort from 'onnxruntime-web/webgpu';
+
+async function runLocalInference() {
+  const modelUrl = '/models/llama3x_8b_awq_4bit.onnx'; // or a GGUF file via WebAssembly llama.cpp port
+
+  console.log("Checking WebGPU support...");
+  if (!navigator.gpu) {
+    throw new Error("WebGPU is not supported on this browser/device. Falling back to CPU.");
+  }
+
+  console.log("Loading quantized weights into WebGPU VRAM...");
+  const sessionOptions = {
+    executionProviders: ['webgpu'],
+    preferredOutputLocation: 'gpu-buffer' // Prevent memory copy overhead
+  };
+
+  const session = await ort.InferenceSession.create(modelUrl, sessionOptions);
+  console.log("Model successfully compiled to GPU shaders!");
+
+  // Mock input tokens (Llama-3.x token format)
+  const inputIds = new BigInt64Array([1n, 512n, 3090n]); // "Hello world"
+  const inputTensor = new ort.Tensor('int64', inputIds, [1, inputIds.length]);
+
+  let generatedCount = 0;
+  const startTime = performance.now();
+
+  // Simple auto-regressive generation loop
+  let currentInput = inputTensor;
+  for (let i = 0; i < 50; i++) {
+    const feeds = { input_ids: currentInput };
+    const outputs = await session.run(feeds);
+    
+    // Extract next token ID
+    const nextTokenIds = outputs.logits; // WebGPU buffer target
+    generatedCount++;
+    
+    // In a real app, feed token back into sequence
+    // currentInput = updateSequence(currentInput, nextTokenIds);
+  }
+
+  const duration = (performance.now() - startTime) / 1000;
+  const tokensPerSec = generatedCount / duration;
+  console.log(`[EDGE INFERENCE] Throughput: ${tokensPerSec.toFixed(2)} tokens/sec`);
+  
+  if (globalThis.performance && performance.memory) {
+     console.log(`[EDGE RAM] Heap Used: ${(performance.memory.usedJSHeapSize / (1024*1024)).toFixed(2)} MB`);
+  }
+}
+```
+
+### 9. Common Pitfalls & Misconceptions
+
+- **Misconception: "WebGPU is just for 3D games."**
+  **Reality:** WebGPU is a highly optimized general-purpose parallel compute API. It allows browser scripts to execute matrix multiplications directly on GPU cores, performing at near-native C++ speeds.
+- **Pitfall: Neglecting the KV Cache on Edge.**
+  If you do not reuse the Key-Value (KV) cache of previous tokens in your auto-regressive loop, the edge device will recompute the entire history for every new token. This leads to quadratic scaling of latency $O(N^2)$ and immediate thermal throttling. Keep the KV cache bound on GPU memory.
+
+### 10. Prerequisites & Next Steps
+
+**Prerequisites:** Understanding of weight representation (FP16/INT4), browser memory structures, and basic GPU core execution models.
+**Next Steps:** While edge execution solves client-side hosting costs, server-side fallbacks are still required when devices lack WebGPU support. Day 092 will explore building high-availability **Multi-Provider LLM Gateways** to route dynamically across edge, serverless, and self-hosted instances.
+
+### 11. Further Reading & Resources
+
+- _AWQ: Activation-aware Weight Quantization for LLM Compression_ (Lin et al.) - The original paper detailing activation preservation.
+- _ONNX Runtime Web Documentation_ - Best practices for threading and GPU buffering in Javascript.
+- _WebGPU Explainer (W3C)_ - A deep dive into the design and performance characteristics of WebGPU.
+- _llama.cpp GitHub Repository_ - The canonical CPU/GPU inference runtime for GGUF-format models, supporting Metal (Apple Silicon), CUDA, and Vulkan backends.
+- _ExLlamaV2 GitHub Repository_ - High-throughput NVIDIA GPU inference engine for GPTQ/EXL2 quantized models with GGUF support.
+- _Apple MLX Documentation_ - Apple's native ML framework for unified memory Apple Silicon, with LLM inference examples for Llama, Phi-4, and Gemma 3 families.
+- _Qualcomm AI Hub_ - Model optimization, profiling, and deployment pipeline for Snapdragon-powered Android and Windows on ARM devices.

@@ -41,7 +41,7 @@ In a Responsible AI framework, these metrics are not equal. **Faithfulness is a 
 
 ### 3. Theoretical Foundations
 
-We utilize the **LLM-as-a-Judge** paradigm. Since linguistic correctness is hard to measure with regex, we employ a stronger model (e.g., GPT-4 or a specialized fine-tuned evaluator) to grade the outputs of the production model.
+We utilize the **LLM-as-a-Judge** paradigm. Since linguistic correctness is hard to measure with regex, we employ a stronger model (e.g., GPT-4o or a specialized fine-tuned evaluator) to grade the outputs of the production model.
 
 For **Faithfulness**, the evaluation logic follows NLI (Natural Language Inference):
 Given Context $C$ and Answer $A$, we extract statements $S$ from $A$.
@@ -73,18 +73,15 @@ An ad-hoc evaluation script is insufficient. Evaluation must be part of the **Co
 - The script simulates a "Pull Request" check.
 - It prioritizes Faithfulness over Relevancy.
 
-#### The Implementation
-
-```python
+#### The Implementa```python
 import pandas as pd
-from ragas import evaluate
+from ragas import evaluate, EvaluationDataset
 from ragas.metrics import (
-    context_precision,
-    context_recall,
-    faithfulness,
-    answer_relevancy,
+    ContextPrecision,
+    ContextRecall,
+    Faithfulness,
+    AnswerRelevancy,
 )
-from datasets import Dataset
 
 # --- Configuration ---
 # In production, these are loaded from environment variables/config files
@@ -103,23 +100,36 @@ def run_evaluation_pipeline(test_dataset: dict):
     Simulates the evaluation step in a CI pipeline.
 
     Args:
-        test_dataset: Dict containing 'question', 'answer', 'contexts', 'ground_truth'
-                      (In reality, 'answer' comes from the model being tested)
+        test_dataset: Dict containing 'user_input', 'response', 'retrieved_contexts', 'reference'
+                      (In reality, 'response' comes from the model being tested)
     """
 
-    # 1. Convert to HuggingFace Dataset format required by Ragas
-    hf_dataset = Dataset.from_dict(test_dataset)
+    # 1. Convert to RAGAs EvaluationDataset (v0.2+ API)
+    eval_dataset = EvaluationDataset.from_list([
+        {
+            "user_input": q,
+            "response": a,
+            "retrieved_contexts": c,
+            "reference": g,
+        }
+        for q, a, c, g in zip(
+            test_dataset["question"],
+            test_dataset["answer"],
+            test_dataset["contexts"],
+            test_dataset["ground_truth"],
+        )
+    ])
 
-    # 2. Run Ragas Evaluation
+    # 2. Run Ragas Evaluation (v0.2+ API uses keyword argument)
     # This uses an LLM (Judge) to score the interactions
     print("Running automated evaluation (LLM-as-a-Judge)...")
     results = evaluate(
-        hf_dataset,
+        dataset=eval_dataset,
         metrics=[
-            context_precision,
-            context_recall,
-            faithfulness,
-            answer_relevancy,
+            ContextPrecision(),
+            ContextRecall(),
+            Faithfulness(),
+            AnswerRelevancy(),
         ],
     )
 
@@ -182,13 +192,16 @@ except QualityGateFailure:
     print("(Expected behavior: Pipeline blocked due to hallucination.)")
 
 
+```)")
+
+
 ```
 
 ### 6. Ethical, Security & Safety Considerations
 
 - **Adversarial Contamination**: If your evaluation dataset is static, developers will inadvertently "overfit" to the test set. You must continuously rotate and generate new synthetic questions to prevent metric hacking.
 - **The Cost-Security Trade-off**: Running evaluations costs money (API calls to the Judge LLM). Some teams skip evals to save budget. This is a false economy. The cost of a reputational incident far exceeds the cost of tokens.
-- **Bias in the Judge**: Be aware that "LLM-as-a-Judge" models (usually GPT-4) have their own biases. They tend to favor longer, more verbose answers (length bias) even if they are less concise.
+- **Bias in the Judge**: Be aware that "LLM-as-a-Judge" models (usually GPT-4o) have their own biases. They tend to favor longer, more verbose answers (length bias) even if they are less concise.
 
 ### 7. Business & Strategic Implications
 
@@ -213,6 +226,7 @@ except QualityGateFailure:
 
 ### 10. Further Reading & Resources
 
-- **Framework**: _Ragas: Automated Evaluation of Retrieval Augmented Generation_ (Es et al., 2023).
+- **Framework**: _Ragas: Automated Evaluation of Retrieval Augmented Generation_ (Es et al., 2023). Note: The library has migrated to a v0.2+ API using `EvaluationDataset` and class-based metrics—check the official docs for the latest import paths.
 - **Paper**: _G-Eval: NLG Evaluation using GPT-4 with Better Human Alignment_ (Liu et al.).
 - **Tool**: _Arize Phoenix_ for visualizing RAG traces and evaluations.
+- **Tool**: _Langfuse_ (open-source LLM observability platform with native RAGAs integration for tracking evaluation scores over time).

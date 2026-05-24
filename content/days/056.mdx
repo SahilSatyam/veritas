@@ -11,7 +11,7 @@ date: "2026-02-25"
 
 ### Abstract
 
-"Documentation Drift" is the silent compliance killer. It occurs when the PDF report describing a model (v1.0) remains static while the production system auto-updates to v3.2. In regulated environments, a mismatch between documented behavior and actual behavior is not just a bug; it is a falsified record. This post replaces the manual "write-up" with **Dynamic Model Cards**—immutable artifacts generated programmatically by the CI/CD pipeline. By fusing human-authored context (Intended Use) with machine-generated facts (Accuracy, Fairness Scores), we create a "living" document that is guaranteed to match the deployed binary, serving as a single source of truth for auditors, executives, and engineers.
+"Documentation Drift" is the silent compliance killer. It occurs when the PDF report describing a model (v1.0) remains static while the production system auto-updates to v3.2. In regulated environments, a mismatch between documented behavior and actual behavior is not just a bug; it is a falsified record. **As of August 2026, the EU AI Act mandates that high-risk AI systems maintain current, accurate technical documentation—making dynamic model documentation a legal requirement, not a best practice.** This post replaces the manual "write-up" with **Dynamic Model Cards**—immutable artifacts generated programmatically by the CI/CD pipeline. By fusing human-authored context (Intended Use) with machine-generated facts (Accuracy, Fairness Scores), we create a "living" document that is guaranteed to match the deployed binary, serving as a single source of truth for auditors, executives, and engineers.
 
 ### 1. Why This Topic Matters
 
@@ -21,7 +21,7 @@ In traditional software, if the docs are outdated, a developer gets annoyed. In 
 2. **Incidents Escalate:** On-call engineers cannot determine if a failure is due to a known limitation (e.g., "Does not work for low-light images") because that limitation was discovered _after_ the initial PDF was written.
 3. **Shadow AI:** Stakeholders rely on tribal knowledge rather than the system record.
 
-**The shift:** Treat documentation as a **Build Artifact**, not a post-launch administrative chore. If the documentation fails to generate, the deployment fails.
+**The shift:** Treat documentation as a **Build Artifact**, not a post-launch administrative chore. If the documentation fails to generate, the deployment fails. Under the EU AI Act (Article 13 – Transparency, and Article 11 – Technical Documentation), this is now a legal obligation for high-risk systems: documentation must be kept up to date and accurate throughout the system's lifecycle.
 
 ### 2. Core Concepts & Mental Models
 
@@ -190,7 +190,7 @@ steps:
     run: python generate_card.py
 
   - name: Upload Artifact
-    uses: actions/upload-artifact@v3
+    uses: actions/upload-artifact@v4
     with:
       name: model-documentation
       path: MODEL_CARD.md
@@ -217,6 +217,7 @@ Do not log raw data samples or PII in the card. Use hashes (`data_version_hash`)
 1. **Audit Defense:** When a regulator asks, "What was running on March 12th?", you don't scramble. You pull the `MODEL_CARD.md` associated with that release tag. It contains the exact hash, metrics, and known limitations _at that time_.
 2. **Vendor Transparency:** If you sell AI (B2B), providing a rigorous Model Card with every API update builds immense trust with enterprise buyers who have their own compliance requirements.
 3. **Onboarding:** New engineers can read the card to understand the system's boundaries without reading 5,000 lines of training code.
+4. **EU AI Act Compliance:** For high-risk systems, EU AI Act Articles 11 and 13 require current, accurate technical documentation and transparency information. Dynamic Model Cards are the engineering implementation of these requirements—automated generation ensures documentation never lags a deployment. Non-compliant organizations face fines of up to €30M or 6% of global annual turnover.
 
 ### 8. Common Pitfalls & Misconceptions
 
@@ -246,7 +247,8 @@ A Model Card documents what a model _does_. The next challenge is proving what a
 
 ### 10. Further Reading & Resources
 
-- **Paper:** "Model Cards for Model Reporting" (Margaret Mitchell et al., 2019).
-- **Tool:** [Google Model Card Toolkit](https://github.com/tensorflow/model-card-toolkit) – More complex, Protobuf-based alternative.
-- **Standard:** ISO/IEC 42001 (AI Management Systems) – Requires documented system specifications.
+- **Paper:** "Model Cards for Model Reporting" (Margaret Mitchell et al., 2019) – The original specification; now the de-facto standard.
+- **Tool:** [Google Model Card Toolkit](https://github.com/tensorflow/model-card-toolkit) – More complex, Protobuf-based alternative for structured generation.
+- **Regulation:** EU AI Act Articles 11 (Technical Documentation) and 13 (Transparency) – These articles make current, accurate model documentation a **legal requirement** for high-risk AI systems from August 2026.
+- **Standard:** ISO/IEC 42001 (AI Management Systems) – Requires documented system specifications and supports the dynamic card approach.
 - **Concept:** A visual example of a completed, rigorous Model Card.

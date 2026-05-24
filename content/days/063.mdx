@@ -12,7 +12,7 @@ date: "2026-03-05"
 
 ### Abstract
 
-Autonomous agents executing long-horizon tasks are fundamentally constrained by their operational memory: the context window. Without engineered memory management, an agent running a 20-step loop will inevitably suffer from "Context Overflow." It fills its token limit, crashes the API request, or silently truncates its history—often forgetting the user's original goal entirely. Relying on massive (1M+ token) context windows is an expensive, high-latency trap. This artifact defines the "Context Window Economy," demonstrating how to architect tiered memory systems that dynamically compress historical state while rigidly enforcing data privacy and operational focus.
+Autonomous agents executing long-horizon tasks are fundamentally constrained by their operational memory: the context window. Without engineered memory management, an agent running a 20-step loop will inevitably suffer from "Context Overflow." It fills its token limit, crashes the API request, or silently truncates its history—often forgetting the user's original goal entirely. The arrival of large context windows—GPT-4.1 and Gemini 2.0 Flash both support up to 1 million tokens, while Claude 3.7 Sonnet supports 200K—has raised the ceiling dramatically, but relying blindly on these massive contexts is still an expensive, high-latency trap. This artifact defines the "Context Window Economy," demonstrating how to architect tiered memory systems that dynamically compress historical state while rigidly enforcing data privacy and operational focus.
 
 ---
 
@@ -38,9 +38,9 @@ The mental model is **The Pinch**. You must "pinch" the ends of the context: the
 
 Why not simply use models with 1-million-token context windows?
 
-First, compute complexity. The standard attention mechanism scales quadratically—or at best, linearly with heavy optimization—meaning latency and cost skyrocket as the context grows.
+First, compute complexity. The standard attention mechanism scales quadratically—or at best, linearly with heavy optimization—meaning latency and cost skyrocket as the context grows. Even with frontier models like GPT-4.1 or Gemini 2.0 Flash that nominally support 1M-token windows, filling them entirely incurs significant latency and per-token cost penalties.
 
-Second, the **"Lost in the Middle"** phenomenon. Research consistently demonstrates that LLMs have a U-shaped recall curve. They perfectly retrieve information from the very beginning and the very end of a prompt, but drastically fail to retrieve facts buried in the middle of a massive context window. Feeding an agent 100 pages of its own logs degrades its reasoning capability.
+Second, the **"Lost in the Middle"** phenomenon. Research consistently demonstrates that LLMs have a U-shaped recall curve. They perfectly retrieve information from the very beginning and the very end of a prompt, but drastically fail to retrieve facts buried in the middle of a massive context window. Feeding an agent 100 pages of its own logs degrades its reasoning capability—regardless of nominal context size.
 
 ### 4. Production-Grade Implementation
 
@@ -111,7 +111,7 @@ class MemoryManager:
         return re.sub(r"\b\d{3}-\d{2}-\d{4}\b", "[REDACTED_SSN]", text)
 
     def _summarize_middle(self, text_to_compress: str) -> str:
-        # This would call a fast, cheap LLM (e.g., Gemini Flash) in production.
+        # This would call a fast, cheap LLM (e.g., Gemini 2.0 Flash or GPT-4o mini) in production.
         return f"[System: Compressed History] {text_to_compress[:50]}... (Summarized)"
 
     def _enforce_economy(self):

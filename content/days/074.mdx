@@ -18,7 +18,7 @@ date: "2026-03-06"
 
 ### Abstract
 
-Standard retrieval-augmented generation (RAG) relies on dense vector embeddings to find semantically similar text. However, vector search fundamentally lacks topological awareness; it cannot reliably synthesize relationships distributed across disjointed documents. This document mandates the integration of Knowledge Graphs (GraphRAG) for multi-hop reasoning systems. By extracting entities and their relationships into a structured graph database, we enable deterministic, explainable traversal of complex networks. Furthermore, we address the critical ethical mandate of auditing these auto-generated graphs to prevent structural bias and algorithmic redlining.
+Standard retrieval-augmented generation (RAG) relies on dense vector embeddings to find semantically similar text. However, vector search fundamentally lacks topological awareness; it cannot reliably synthesize relationships distributed across disjointed documents. This document mandates the integration of Knowledge Graphs (GraphRAG) for multi-hop reasoning systems. Microsoft's **GraphRAG** framework—officially released and production-ready—provides a turnkey pipeline for entity extraction, community detection, and hierarchical summarization over private corpora. By extracting entities and their relationships into a structured graph database, we enable deterministic, explainable traversal of complex networks. Furthermore, we address the critical ethical mandate of auditing these auto-generated graphs to prevent structural bias and algorithmic redlining.
 
 ### 1. Why This Topic Matters
 
@@ -50,8 +50,10 @@ To answer a multi-hop query between entity $v_1$ and $v_k$, the system must comp
 A production GraphRAG pipeline consists of three distinct phases:
 
 1. **The Ingestion & Extraction Pipeline:** Raw text is passed through an LLM (or a specialized NLP model like SpaCy/GLiNER) explicitly prompted to extract triples according to a strict ontology (e.g., standardizing predicates to `OWNED_BY`, `LOCATED_IN`, `WORKS_FOR`).
-2. **The Graph Database:** Triples are loaded into a graph database (e.g., Neo4j, Amazon Neptune, or Memgraph) that supports graph traversal languages like Cypher or Gremlin.
+2. **The Graph Database:** Triples are loaded into a graph database that supports graph traversal languages like Cypher or Gremlin. **Neo4j** remains the enterprise standard; **FalkorDB** (a Redis-based graph database) offers sub-millisecond latency for high-throughput graph queries; Amazon Neptune provides a managed alternative.
 3. **The Retrieval Orchestrator:** When a user queries the system, an LLM extracts the target entities from the query, executes a graph traversal query to find subgraphs or paths connecting those entities, and passes the resulting network topology back to the LLM for final synthesis.
+
+For teams that need a lightweight, self-contained alternative to the full Microsoft GraphRAG stack, **Nano-GraphRAG** is an open-source implementation that reproduces the core pipeline (entity extraction → graph construction → community summarization → retrieval) in a minimal Python codebase suitable for rapid prototyping and on-premises deployments.
 
 ### 5. Hands-On Project / Exercise
 
@@ -144,6 +146,7 @@ print(query_graph_rag("Alice", "Initech"))
 
 ### 11. Further Reading & Resources
 
-- Microsoft Research: _GraphRAG: Unlocking LLM discovery on narrative private data_.
+- Microsoft GraphRAG: Official release documentation and the `graphrag` Python package.
+- Nano-GraphRAG: Lightweight open-source GraphRAG implementation on GitHub.
 - _Knowledge Graphs: Fundamentals, Techniques, and Applications_ (Mayank Kejriwal).
-- Neo4j Documentation on integrating Cypher with LangChain/LlamaIndex.
+- Neo4j and FalkorDB documentation on integrating Cypher with LangChain/LlamaIndex.

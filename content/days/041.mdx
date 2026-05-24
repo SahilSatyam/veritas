@@ -156,7 +156,7 @@ Prompt: _"Explain this policy to an 8th grader. Ensure you explicitly state if f
 In the example above, `fraud_attempt_01` is a safety regression test. As you tune prompts to be "helpful," models often become more compliant, inadvertently bypassing safety training. Hard-coding refusal scenarios into your regression suite is mandatory for defensive engineering.
 
 **Bias in Evaluation Models**
-Be aware that using a small embedding model to judge a large LLM can be limiting. If the embedding model doesn't understand the nuance of "negligence," it might pass a bad translation. For high-stakes domains (legal, medical), consider using a stronger model (e.g., GPT-4 or a finetuned BERT) as the judge, despite the cost.
+Be aware that using a small embedding model to judge a large LLM can be limiting. If the embedding model doesn't understand the nuance of "negligence," it might pass a bad translation. For high-stakes domains (legal, medical), consider using a stronger model (e.g., GPT-4o, Claude 3.7 Sonnet, or a finetuned BERT) as the judge, despite the cost.
 
 ### 7. Business & Strategic Implications
 
@@ -250,6 +250,7 @@ Create a `tests/` folder in your current LLM project. Write **one** test case fo
 
 - **RAGAS (Retrieval Augmented Generation Assessment):** Framework for evaluating RAG pipelines. Now the industry standard for Faithfulness, Context Relevancy, and Answer Relevancy metrics.
 - **DeepEval:** An open-source evaluation framework for LLMs that integrates with pytest. Supports 14+ metrics out of the box.
-- **Braintrust:** Production-grade LLM evaluation platform with experiment tracking and A/B testing.
-- **LLM-as-a-Judge Patterns:** Using GPT-4 or Claude to grade outputs. See the "G-Eval" paper for the theoretical foundation.
+- **Promptfoo:** A popular open-source CLI and library for prompt testing and evaluation. Supports running test suites across multiple models, comparing outputs, and integrating into CI/CD pipelines. Ideal for teams wanting a lightweight, code-first evaluation harness.
+- **Braintrust:** Production-grade LLM evaluation platform with experiment tracking, A/B testing, and a dataset management UI for iterating on prompt quality over time.
+- **LLM-as-a-Judge Patterns:** Using GPT-4o or Claude 3.7 Sonnet to grade outputs. See the "G-Eval" paper for the theoretical foundation.
 - **Instructor + Pydantic:** For structured output validation as an evaluation mechanism.

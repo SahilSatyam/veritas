@@ -33,7 +33,7 @@ You must be able to deploy or rollback this entire triplet as a single unit.
 Git is designed for text (diffs). It chokes on large binaries (datasets/models).
 
 - **Git**: Tracks the logic and the **pointers** (metadata files).
-- **DVC (Data Version Control)**: Tracks the **blobs** (large files) and stores them in cheap object storage (S3/GCS/Azure), while syncing the metadata to Git.
+- **DVC (Data Version Control)**: Tracks the **blobs** (large files) and stores them in cheap object storage (S3/GCS/Azure), while syncing the metadata to Git. A modern enterprise alternative is **LakeFS**, which layers Git-like branching semantics (branches, commits, merges) directly on top of your existing object storage, enabling atomic cross-dataset transactions without changing your storage provider.
 
 ### The "Clean Repo" Policy
 
@@ -181,7 +181,7 @@ python train.py
 ## 7. Business & Strategic Implications
 
 - **Competitive Advantage**: The team that can rollback instantly has higher velocity. Teams without data versioning are paralyzed by fear of breaking things, slowing down deployment.
-- **Asset Management**: Data is a company asset. Storing it on a laptop or a shared drive is negligent. DVC + Cloud Storage turns data into a managed, backed-up, versioned asset.
+- **Asset Management**: Data is a company asset. Storing it on a laptop or a shared drive is negligent. DVC + Cloud Storage (or LakeFS for teams that need Git-like branching on entire data lakes) turns data into a managed, backed-up, versioned asset.
 - **Bus Factor**: If the engineer who "knows where the clean data is" leaves, the project dies. Versioning institutionalizes this knowledge.
 
 ## 8. Common Pitfalls & Misconceptions
@@ -214,5 +214,6 @@ python train.py
 ## 11. Further Reading
 
 - **Tooling**: _DVC Documentation_ - Get Started
+- **Modern Alternative**: _LakeFS_ (lakefsproject.com) - Git-like branching and versioning directly on S3/GCS/Azure; ideal for teams managing large data lakes at scale.
 - **Concept**: _The ML Test Score: A Rubric for ML Production Readiness_ (Google) - specifically the sections on reproducibility.
 - **Security**: _Remove sensitive data from a repository_ - What to do if you did commit a secret (History rewriting).

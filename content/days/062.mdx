@@ -50,7 +50,10 @@ Highly detailed schemas with heavy regex validations and enumerations consume si
 _The Resolution:_ **Asymmetric Strictness.** For read-only actions (e.g., `search_docs`), favor lean schemas with minimal constraints to optimize for velocity and token cost. For mutative or destructive actions (e.g., `update_database_record`, `refund_customer`), favor maximum validation strictness. The token overhead is a negligible premium for the insurance of data integrity. Never compromise API safety for inference speed.
 
 **Implementation with Pydantic:**
-We use Pydantic to bridge the gap between Python type hinting and JSON Schema generation. The `Field(description=...)` parameter is where prompt engineering occurs. You must instruct the model _how_ to generate the field, not just _what_ the field is.
+We use Pydantic (v2 is now the standard) to bridge the gap between Python type hinting and JSON Schema generation. The `Field(description=...)` parameter is where prompt engineering occurs. You must instruct the model _how_ to generate the field, not just _what_ the field is.
+
+**Provider-Native Tool Calling:**
+Modern frontier APIs handle schema enforcement natively. **OpenAI's function calling** now supports two important production features: (1) **Parallel tool calls**—the model can invoke multiple tools simultaneously in a single generation step, dramatically reducing multi-step latency; and (2) **Strict mode** (`strict: true`)—grammar-constrained decoding is enforced at the API level, guaranteeing the output matches your JSON schema structurally. **Anthropic's tool use API** follows a similar pattern, accepting a `tools` array with JSON Schema definitions and returning structured `tool_use` blocks that the host system must execute before continuing the conversation. These provider-native approaches complement Pydantic validation but do not replace server-side semantic validation.
 
 ### 5. Hands-On Project / Exercise
 
@@ -148,5 +151,7 @@ def search_database(llm_payload: dict) -> str:
 
 ### 11. Further Reading & Resources
 
-- Pydantic Documentation: specifically sections on JSON Schema generation and custom validators.
+- Pydantic Documentation (v2): specifically sections on JSON Schema generation, `model_json_schema()`, and custom validators using `@field_validator`.
+- OpenAI Function Calling documentation: parallel tool calls and strict mode.
+- Anthropic Tool Use documentation: the `tool_use` content block pattern.
 - OWASP Top 10 for LLM Applications: Reference **LLM08: Agency/Plugin Insecure Design** for deep-dives into the Principle of Least Privilege in tool creation.

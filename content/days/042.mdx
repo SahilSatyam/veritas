@@ -18,9 +18,9 @@ In traditional software, if a new feature fails, you roll back. In AI Engineerin
 Synthetic test sets (Day 41) are necessary but insufficient. They represent the world as you _imagine_ it, not as it _is_. Production traffic contains noise, malice, and edge cases that no "Golden Dataset" can fully capture.
 
 **The Failure Mode: Big Bang Failures**
-Imagine you upgrade from `gpt-3.5-turbo` to a fine-tuned Llama 3 model to save costs. The Llama model passed all your unit tests. You flip the switch. Immediately, users start complaining that the chatbot is refusing to answer benign questions because the fine-tuning data was too safety-heavy. You have to roll back, but you've already eroded user trust.
+Imagine you upgrade from `gpt-3.5-turbo` to a fine-tuned Llama 3.3 model to save costs. The Llama model passed all your unit tests. You flip the switch. Immediately, users start complaining that the chatbot is refusing to answer benign questions because the fine-tuning data was too safety-heavy. You have to roll back, but you've already eroded user trust.
 
-Shadow deployment allows you to run that Llama 3 model alongside GPT-3.5 for a week. You would have seen the refusal spike in the logs _before_ a single user was affected.
+Shadow deployment allows you to run that Llama 3.3 model alongside GPT-3.5 for a week. You would have seen the refusal spike in the logs _before_ a single user was affected.
 
 ### 2. Core Concepts & Mental Models
 
@@ -181,6 +181,13 @@ If Shadow Mode is too expensive, use a **Canary Deployment**. Route 1% of traffi
 - _Benefit:_ No double billing.
 - _Guidance:_ Use Shadow for major architectural changes. Use Canary for minor prompt tweaks.
 
+**Feature Flagging for Dynamic Routing**
+Rather than hard-coding routing logic, production teams use **feature flag platforms** to control which users hit which model version at runtime—without a code redeploy.
+
+- **LaunchDarkly:** Enterprise-grade feature management with targeting rules, percentage rollouts, and kill switches ideal for progressive canary traffic routing.
+- **Flagsmith:** Open-source alternative to LaunchDarkly, self-hostable, with a Python SDK that integrates natively into inference services.
+- _Pattern:_ A flag named `model_version` routes `control` group to the live model and `experiment` group to the shadow model. This makes shadow promotion as simple as flipping a flag in a UI.
+
 ### 7. Business & Strategic Implications
 
 - **Metric Validation:** Shadow mode is the only way to prove "Model B is 40% cheaper" with definitive ROI data before committing to the switch.
@@ -241,5 +248,5 @@ Implement a "Diff Viewer" dashboard. Create a script that pulls 100 random reque
 ### 10. Further Reading & Resources
 
 - **Scientific Debugging:** _Why Programs Fail_ by Andreas Zeller (Concepts apply to AI).
-- **Feature Flags:** Look into LaunchDarkly or Unleash for managing traffic routing dynamically.
-- **Model Observability:** Arize AI or WhyLabs for monitoring model drift in shadow mode.
+- **Feature Flags:** LaunchDarkly (enterprise) or Flagsmith (open-source, self-hostable) for managing traffic routing dynamically without redeployment.
+- **Model Observability:** Arize AI, WhyLabs, or Evidently AI for monitoring model drift in shadow mode.

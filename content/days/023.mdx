@@ -27,6 +27,8 @@ Standard Zero-Shot prompting fails on arithmetic, symbolic logic, and scheduling
 CoT transforms a mapping problem ($X \rightarrow Y$) into a sequential derivation problem ($X \rightarrow z_1 \rightarrow z_2 \rightarrow Y$).
 By forcing the model to output intermediate steps, you provide it with a "scratchpad." The model conditions its final answer on its own generated reasoning, significantly increasing logical consistency.
 
+> **Note:** Many frontier models (GPT-4o, Claude 3.7 Sonnet, Gemini 2.5 Pro) now perform internal chain-of-thought automatically without explicit prompting. However, _explicit_ CoT prompting via XML tags remains best practice for auditable, controllable reasoning in production systems.
+
 #### ReAct (Reasoning + Acting)
 
 While CoT is internal thinking, ReAct connects thinking to external tools.
@@ -36,6 +38,16 @@ While CoT is internal thinking, ReAct connects thinking to external tools.
 - **Observation:** `$45.00`
 - **Thought:** "The item costs $50. They have insufficient funds."
 - **Answer:** "Transaction declined."
+
+#### Extended Thinking (Inference-Time Compute Scaling)
+
+A third paradigm, pioneered by OpenAI's o1/o3/o4-mini series and Anthropic's Claude 3.7 Sonnet with extended thinking mode, scales reasoning by allocating additional **inference-time compute** rather than relying on prompt structure.
+
+- The model reasons internally for seconds or minutes before producing output.
+- You do not craft a CoT prompt — you set a "thinking budget" (tokens or seconds) and the model self-organizes its reasoning.
+- **Key models:** OpenAI o3, o4-mini; Claude 3.7 Sonnet (extended thinking mode); Gemini 2.0 Flash Thinking; DeepSeek-R1.
+- **Trade-off:** Dramatically better on hard logic/math; dramatically more expensive and slower. Not suitable for latency-sensitive paths.
+- **Your gateway abstraction must account for this:** these models have different API parameters (`reasoning_effort`, `thinking_budget`) compared to standard chat completions.
 
 #### Self-Consistency (The "Ensemble" Method)
 
@@ -167,6 +179,7 @@ def parse_cot_response(llm_response: str):
 
 - **The "Zero-Shot CoT" Cheat:** Simply adding "Let's think step by step" is a weak version of CoT. For production, you need the **Structured CoT** (xml tags) demonstrated above to ensure the thinking happens _before_ the answer.
 - **Reasoning Drifts:** In very long reasoning chains, the model might lose track of the original constraint. Keep the "thought" steps concise.
+- **Using Extended Thinking for Simple Queries:** Routing a "What's the weather?" question to an o3-class reasoning model is wasteful. Implement **Complexity Routing** (see Day 21) to reserve inference-time compute models for tasks that actually need them.
 
 ### 9. Next Steps
 

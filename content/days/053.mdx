@@ -194,7 +194,7 @@ If we use this probe as a reward model in training (e.g., "penalize the model if
 ### 7. Business & Strategic Implications
 
 1. **Liability Shield:** In regulated advice (financial/medical), a "Truth Probe" log serves as evidence that the system's internal logic was sound, even if the generation layer faltered (or vice versa).
-2. **Evaluating Vendor Models:** You cannot probe closed APIs (GPT-4) deeply. This is a strategic argument for **Open Weights** models (Llama 3, Mistral) in high-compliance sectors. If you can't probe the weights, you can't verify the reasoning.
+2. **Evaluating Vendor Models:** You cannot probe closed APIs (GPT-4o, Gemini 2.5 Pro) deeply. This is a strategic argument for **Open Weights** models (Llama 3.3, Mistral, Qwen2.5) in high-compliance sectors. If you can't probe the weights, you can't verify the reasoning.
 3. **Hallucination Firewall:** Before showing a response to a user, run the probe. If `Confidence(Text) > 90%` but `Probe(Truth) < 50%`, block the response.
 
 ### 8. Common Pitfalls & Misconceptions
@@ -220,6 +220,7 @@ If we use this probe as a reward model in training (e.g., "penalize the model if
 1. **Scale Up:** Train a probe on the `TruthfulQA` dataset for a more rigorous evaluation.
 2. **Visualize:** Use PCA to plot the activations of True vs. False statements in 2D to see the separation.
 3. **Integrate:** Build a "Guardrails" wrapper that checks the probe value before streaming the token.
+4. **Advanced — SAE Probing:** Use Sparse Autoencoders (SAEs) to first decompose polysemantic neurons into monosemantic features, then probe those features for truth-directional signals. This 2024–2025 technique from Anthropic research (see Neuronpedia) provides far more interpretable probes than raw activation probing.
 
 Probing tells you _whether_ the model is being honest. The next layer of the problem is _who_ the model is being honest with—and whether its errors are distributed fairly across groups. **Day 54: Fairness Auditing: Group Metrics & The Impossibility Theorem** operationalizes this as a hard CI/CD gate.
 
@@ -228,4 +229,5 @@ Probing tells you _whether_ the model is being honest. The next layer of the pro
 - **Paper:** "The Geometry of Truth: Mechanism of True and False in LLMs" (Marks/Tegmark, 2023).
 - **Paper:** "Discovering Latent Knowledge in Language Models Without Supervision" (Burns et al., 2022).
 - **Tool:** [TransformerLens](https://github.com/neelnanda-io/TransformerLens) – A library for mechanistic interpretability of GPT-style models.
+- **Technique:** SAE-based probing – Use Sparse Autoencoders to decompose activations into interpretable features before probing; see Anthropic's Scaling Monosemanticity (2024) and [Neuronpedia](https://neuronpedia.org).
 - **Concept:** Visualizing how "True" and "False" statements form distinct clusters in the model's residual stream.

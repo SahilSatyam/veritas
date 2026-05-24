@@ -27,7 +27,7 @@ Imagine a fraud detection model.
 ### 2. Core Concepts & Mental Models
 
 **The Feature Store Architecture**
-A Feature Store (like Feast or Tecton) acts as the interface between your raw data and your models. It serves two masters:
+A Feature Store (like Feast, Hopsworks, or Tecton) acts as the interface between your raw data and your models. It serves two masters:
 
 1. **The Training Pipeline (High Throughput):** Needs historical data. "What was the value of `feature_X` for User A on Feb 1st at 2:00 PM?"
 2. **The Inference Endpoint (Low Latency):** Needs current data. "What is the value of `feature_X` for User A _right now_?"
@@ -217,10 +217,12 @@ You must be able to replay the Feature Store to June 14th to prove the input vec
 - Docker (to run a local Redis/Feast setup).
 
 **Next Step:**
-Install Feast locally (`pip install feast`). Run `feast init my_project`. Look at the `feature_store.yaml`. Try to add a new feature `max_purchase_value` and materialize it. Now that our data is consistent, we need to know when it breaks. **Day 44: Model Monitoring** covers how to detect when the world changes but your model doesn't.
+Install Feast locally (`pip install feast`). Run `feast init my_project`. Look at the `feature_store.yaml`. Try to add a new feature `max_purchase_value` and materialize it. Note that Feast 0.40+ unifies the push-based and pull-based materialization APIs under a single `feast apply` workflow, simplifying incremental updates. Now that our data is consistent, we need to know when it breaks. **Day 44: Model Monitoring** covers how to detect when the world changes but your model doesn't.
 
 ### 10. Further Reading & Resources
 
-- **Feast Documentation:** The standard for open-source feature stores.
+- **Feast Documentation:** The standard for open-source feature stores. Feast 0.40+ introduces a unified push/pull materialization API and improved streaming support.
+- **Hopsworks:** A leading managed feature platform that bundles the feature store with a model registry and serving layer—popular for teams wanting an integrated MLOps stack without assembling individual tools.
+- **Tecton:** Enterprise-grade feature platform with native support for real-time streaming features, strong governance tooling, and SLA monitoring. The go-to choice for large financial and fraud-detection teams.
 - **"Machine Learning Engineering" by Andriy Burkov:** Chapter on Feature Engineering.
 - **Tecton Blog:** Excellent deep dives into the theory of time-travel in ML.

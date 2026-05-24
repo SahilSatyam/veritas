@@ -21,6 +21,8 @@ The "collect everything, sort it later" mindset is legally defunct.
 
 The goal is **Data Minimization**: Collect only what is needed, and keep it only as long as needed.
 
+> **Regulatory Landscape Update:** Privacy law has proliferated significantly beyond GDPR. In the US, over a dozen states now have comprehensive privacy statutes in effect, including **CPRA** (California, amending CCPA), **VCDPA** (Virginia), **CPA** (Colorado), **CTDPA** (Connecticut), and others. These laws impose consent, deletion, and data minimization requirements similar to GDPR. Any AI system handling US consumer data must now track compliance across multiple overlapping state frameworks, not just federal guidelines.
+
 ---
 
 ### 2. Core Concepts & Mental Models
@@ -41,6 +43,8 @@ Not all PII is created equal:
 A dataset satisfies $k$-anonymity if every record is indistinguishable from at least $k-1$ other records with respect to quasi-identifiers.
 
 - _Example:_ If $k=3$, you cannot pinpoint "John Doe"; you can only identify a group of 3 people who look like him.
+
+> **Modern Practice:** K-Anonymity is no longer used in isolation. Current best practice combines it with **Synthetic Data Generation** (using GANs, diffusion models, or tabular synthesizers like SDV/CTGAN). Instead of generalizing real records, you generate statistically faithful synthetic records that preserve population-level distributions without containing any actual individuals. This eliminates the re-identification attack surface entirely while maintaining high data utility.
 
 ---
 
@@ -67,7 +71,9 @@ Replacing an email with `SHA256(email)` allows you to join tables (e.g., linking
 - **Critical Security Requirement:** You _must_ use a secret "Salt" (random string) added to the input before hashing. Without a salt, a hacker can pre-compute hashes for all known emails (Rainbow Table) and reverse your anonymization.
 
 **Technique 2: Entity Recognition & Redaction**
-For unstructured text (chat logs, support tickets), Regex is fast but brittle. Named Entity Recognition (NER) models (like spaCy or Microsoft Presidio) are robust but computationally expensive. A hybrid approach is best: Regex for clear patterns (Phones/Emails), NER for Names/Locations.
+For unstructured text (chat logs, support tickets), Regex is fast but brittle. Named Entity Recognition (NER) models (like spaCy or **Microsoft Presidio**) are robust but computationally expensive. A hybrid approach is best: Regex for clear patterns (Phones/Emails), NER for Names/Locations.
+
+> **Microsoft Presidio Update:** Presidio is now a production-grade, multi-language PII detection and anonymization framework. It supports 20+ entity types out of the box, pluggable custom recognizers, and both text and image anonymization. It is the recommended choice for enterprise pipelines handling multilingual content.
 
 ---
 
@@ -233,7 +239,9 @@ train_df = (
 
 ### 11. Further Reading & Resources
 
-- **Tool:** [Microsoft Presidio](https://github.com/microsoft/presidio) (Production-grade PII detection).
+- **Tool:** [Microsoft Presidio](https://github.com/microsoft/presidio) (Production-grade, multi-language PII detection and anonymization).
+- **Tool:** [Synthetic Data Vault (SDV)](https://sdv.dev/) (Open-source synthetic tabular data generation — the modern complement to K-Anonymity).
 - **Concept:** [Google's Differential Privacy Library](https://github.com/google/differential-privacy).
 - **Regulation:** [GDPR Official Text (Art. 17)](https://gdpr-info.eu/art-17-gdpr/).
+- **Regulation:** [IAPP US State Privacy Law Tracker](https://iapp.org/resources/article/us-state-privacy-legislation-tracker/) (Comprehensive tracker of CPRA, VCDPA, and other state laws).
 - **Paper:** Sweeney (2002). _k-anonymity: A model for protecting privacy._

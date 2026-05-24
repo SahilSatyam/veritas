@@ -182,6 +182,7 @@ print("Scenario 2 Output:", generator_pass.generate_answer("Do beta users need 2
 - **Auditability**: Regulated industries (FinTech, HealthTech) require an audit trail. "Why did the AI recommend this loan denial?" "Because it relied on Document B, Clause 4." This traceability is a regulatory shield.
 - **User Trust**: Users abandon tools that lie to them once. They stick with tools that say "I don't know" rather than guessing.
 - **Cost of Verification**: Implementing post-generation verification increases latency and token costs (if using a Judge LLM). This is the price of reliability.
+- **The Perplexity.ai Pattern**: The dominant citation UI pattern in production systems (popularized by Perplexity AI and now adopted by Bing Copilot, Google AI Overviews, and enterprise search products) renders inline superscript source numbers (`[1]`, `[2]`) linked directly to source URLs. Each claim is immediately hoverable to preview the source excerpt. When designing your citation UI, adopt this inline-citation pattern over footnote-only or document-list approaches—users have been conditioned to expect it, and it maximally surfaces trust signals at the point of consumption.
 
 ### 8. Common Pitfalls & Misconceptions
 

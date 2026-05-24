@@ -20,7 +20,8 @@ The specific failure mode this post prevents is the **uncritical deployment of d
 
 - **Legal Risk:** In credit, hiring, and housing, disparate impact is illegal regardless of intent.
 - **Performance Risk:** A model that relies on demographic proxies (e.g., zip code as a proxy for race) is often learning spurious correlations rather than causal factors, making it brittle to distribution shifts.
-- **Brand Risk:** Public demonstrations of bias (e.g., facial recognition failures) are difficult to recover from.
+- **Brand Risk:** Public demonstrations of bias (e.g., facial recognition failures) are difficult to recover from. The COMPAS recidivism algorithm audit (Angwin et al., ProPublica) remains the canonical example: the system was nearly twice as likely to falsely flag Black defendants as future criminals compared to white defendants, despite equivalent predictive accuracy on aggregate metrics.
+- **Regulatory Mandate:** Under the EU AI Act (in force August 2024), high-risk AI systems in credit, employment, and law enforcement are legally required to undergo bias audits before deployment and on an ongoing basis.
 
 We are moving from "Is this model accurate?" to "Is this model compliant and robust across subpopulations?"
 
@@ -245,3 +246,4 @@ If the group rarely gets positive outcomes in the raw data, the denominator is s
 - **Tool:** [Microsoft Fairlearn](https://fairlearn.org/)
 - **Paper:** Hardt, Price, Srebro (2016). _Equality of Opportunity in Supervised Learning._
 - **Paper:** Kleinberg et al. (2016). _Inherent Trade-Offs in the Fair Determination of Risk Scores._
+- **Audit:** Angwin et al. (ProPublica, 2016). _Machine Bias: There's Software Used Across the Country to Predict Future Criminals. And It's Biased Against Blacks._ (The COMPAS audit — essential reading for real-world consequences of biased risk scoring.)

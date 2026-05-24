@@ -24,6 +24,8 @@ If your system returns "No documents found" or, worse, retrieves only documents 
 - **The Semantic Gap**: A user query is a _question_. A document is an _answer_. Sometimes these are semantically distant. Transformations attempt to bridge this gap before retrieval begins.
 - **Decomposition (Divide and Conquer)**: Complex queries are often just bundles of simple queries. The system must act as a "Planner," breaking $Q$ into $\{q_1, q_2, ...\}$, executing them in parallel, and synthesizing the results.
 - **HyDE (Hallucinating the Target)**: Instead of embedding the question, the LLM generates a hypothetical answer. We embed that hallucination. Because the hallucination (hopefully) looks like the real document structure, the vector search finds the actual document more effectively.
+- **Step-Back Prompting**: A Google DeepMind technique that instructs the LLM to first generate an abstract, high-level "step-back" question (e.g., rewrite "What is the boiling point of water at 8,000 feet?" to "What are the physics of boiling point and pressure?"). Retrieving against this abstracted query improves recall for highly specific or technical user questions.
+- **Adaptive RAG**: A routing strategy that classifies each incoming query and selects the appropriate retrieval strategy dynamically—direct retrieval for simple factual lookups, single-step retrieval for focused questions, and multi-hop decomposition for complex comparative queries. This avoids the cost of decomposition on every query.
 
 ### 3. Theoretical Foundations
 
@@ -204,4 +206,5 @@ if __name__ == "__main__":
 
 - **Paper**: _Precise Zero-Shot Dense Retrieval without Relevance Labels_ (HyDE Paper, Gao et al.).
 - **Paper**: _Least-to-Most Prompting Enables Complex Reasoning in Large Language Models_.
-- **Concept**: _Step-Back Prompting_ (Google DeepMind).
+- **Paper**: _Step-Back Prompting_ (Google DeepMind) — abstracts the user query to a higher-level principle before retrieval, dramatically improving recall on technical and scientific questions.
+- **Paper**: _Adaptive-RAG: Learning to Adapt Retrieval-Augmented Large Language Models through Question Complexity_ — introduces learned routing to select the right retrieval strategy per query.

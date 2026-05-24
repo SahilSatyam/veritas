@@ -55,7 +55,7 @@ By ensuring these properties, the underlying compute process becomes entirely st
 
 ### 4. Production-Grade Implementation
 
-A production implementation requires an orchestration framework backed by a transactional database (e.g., PostgreSQL).
+A production implementation requires an orchestration framework backed by a transactional database (e.g., PostgreSQL). **LangGraph's checkpointer architecture** is the canonical 2025 pattern: it ships first-class `PostgresSaver` and `SqliteSaver` checkpointers that implement the Write-Ahead Log semantics below automatically. For long-term, cross-session agent memory (distinct from per-run graph state), **Zep** provides a production-grade memory store that persists user facts, session summaries, and conversation history across thread boundaries—enabling agents to recall context from interactions weeks prior.
 
 1. **Thread Identifiers:** Every graph execution must be instantiated with a unique `thread_id`. This is the primary key for state retrieval.
 2. **Write-Ahead Logging (WAL) Pattern:** Before control is passed to the next node, the orchestration engine must synchronously commit the `StateUpdate` to the database.
@@ -153,5 +153,6 @@ def run_phase_two(thread_id: str, human_decision: bool):
 ### 11. Further Reading & Resources
 
 - _Designing Data-Intensive Applications_ by Martin Kleppmann (for foundational concepts on Write-Ahead Logs and durable state).
-- LangGraph Checkpointer Architecture Documentation.
+- LangGraph Checkpointer Architecture Documentation (`PostgresSaver`, `SqliteSaver`).
+- Zep Documentation: Long-Term Memory for AI Agents.
 - NIST AI Risk Management Framework (AI RMF) section on Traceability and Auditing.

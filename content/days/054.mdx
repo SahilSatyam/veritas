@@ -21,7 +21,7 @@ This failure mode leads to:
 
 1. **Allocative Harm:** Denying loans or jobs to qualified minority candidates (False Negatives).
 2. **Punitive Harm:** Falsely flagging minority users for fraud or crime (False Positives).
-3. **Regulatory Collapse:** Violating US EEOC regulations or EU AI Act provisions regarding disparate impact.
+3. **Regulatory Collapse:** Violating US EEOC regulations or EU AI Act provisions regarding disparate impact. Critically, the EU AI Act (enforcement of high-risk system rules from August 2026) **mandates bias audits** for high-risk AI systems in hiring, credit, and similar domains—making the "Fairness Gate" in your CI/CD pipeline a legal requirement, not an optional best practice.
 
 **The Engineering Reality:** Fairness is not a "nice-to-have" ethical add-on; it is a non-functional requirement (NFR) just like latency or uptime.
 
@@ -206,7 +206,9 @@ Auditing tells you _where_ the bias lives. The next step is to surgically remove
 
 ### 10. Further Reading & Resources
 
-- **Tool:** [Fairlearn](https://fairlearn.org/) and [IBM AIF360](https://aif360.mybluemix.net/).
+- **Tool:** [Fairlearn](https://fairlearn.org/) – Microsoft's open-source toolkit for assessing and improving fairness in ML.
+- **Tool:** [IBM AI Fairness 360 (AIF360)](https://aif360.mybluemix.net/) – IBM's comprehensive open-source library with 70+ fairness metrics and 10+ bias mitigation algorithms.
 - **Paper:** "Equality of Opportunity in Supervised Learning" (Hardt et al., 2016).
 - **Regulation:** US EEOC "Uniform Guidelines on Employee Selection Procedures" (Source of the 4/5ths rule).
+- **Regulation:** EU AI Act – Articles 9 and 10 mandate bias testing and data governance for high-risk AI systems; high-risk system rules apply from August 2026.
 - **Concept:** A decision tree helping engineers choose between Demographic Parity, Equal Opportunity, and Calibration based on the use case.
