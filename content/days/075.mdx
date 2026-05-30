@@ -26,7 +26,7 @@ This is not a minor degradation in quality; it is a critical failure of factual 
 To architect multimodal systems, we must differentiate between OCR and true visual reasoning:
 
 - **OCR (Optical Character Recognition) is not Vision:** OCR merely extracts text from pixels. It cannot tell you that a red line on a graph is trending downward, or that a diagram depicts a server architecture.
-- **Vision-Language Models (VLMs):** Production-grade frontier models like **GPT-4o Vision**, **Gemini Vision**, or open-weights champions like **LLaVA-1.6**, **Qwen-VL**, and **InternVL2** accept both text and image tokens natively, capable of deep reasoning about visual relationships, spatial layouts, and chart topologies.
+- **Vision-Language Models (VLMs):** Production-grade frontier models like **GPT-5.5 Vision**, **Gemini 3.1 Pro**, or open-weights champions like **LLaVA-1.6**, **Qwen-VL**, and **InternVL2** accept both text and image tokens natively, capable of deep reasoning about visual relationships, spatial layouts, and chart topologies.
 - **Image Embeddings vs. Image Summaries:**
   - _Embeddings (CLIP/SigLIP):_ Mathematical representations of an image in a shared latent space. While foundational, CLIP is no longer the primary production approach for analytical RAG due to its inability to reason about dense visual details.
   - _Summaries (VLM Extraction):_ Using a highly capable VLM to translate pixel data into structured text (e.g., Markdown tables) to allow standard, high-precision semantic search.

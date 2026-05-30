@@ -25,7 +25,7 @@ In enterprise environments, your service level agreements (SLAs) demand resilien
 
 - **The Multi-Provider Gateway:** A centralized proxy service that acts as the single entry point for all LLM requests within your infrastructure.
 - **Serverless APIs (Pay-as-you-go):** External managed endpoints (e.g., OpenAI, Anthropic, Google Vertex AI, Groq, Together AI, Fireworks AI, and AWS Bedrock Claude) where you pay per token. They offer low upfront costs and infinite scale, but expose you to network latency, rate limits, and compliance risk.
-- **Self-Hosted (Dedicated):** Running open models (e.g., Llama 3.3, Mistral) on dedicated hardware (e.g., vLLM or SGLang on AWS, RunPod, or on-premise GPU clusters). They offer stable costs at high volumes, absolute privacy, and customizability, but require meaningful engineering overhead and scale-up time.
+- **Self-Hosted (Dedicated):** Running open models (e.g., Llama 4, Mistral Large 3, DeepSeek V4) on dedicated hardware (e.g., vLLM or SGLang on AWS, RunPod, or on-premise GPU clusters). They offer stable costs at high volumes, absolute privacy, and customizability, but require meaningful engineering overhead and scale-up time.
 - **AI Gateway Layer:** A production-grade proxy that provides unified API semantics, automatic failover, cost tracking, and load balancing across all providers. **LiteLLM Proxy** has become the standard open-source gateway (100+ models behind an OpenAI-compatible interface). **Portkey** and **OpenRouter** are popular managed alternatives offering real-time routing, spend guards, and detailed observability dashboards.
 - **Dynamic Fallbacks:** Pre-configured execution paths that automatically step down to alternate providers or cheaper open models if the primary provider fails.
 
@@ -48,10 +48,10 @@ By implementing simple parallel redundancy, you convert a fragile $99\%$ system 
 ### 4. Production-Grade Implementation
 
 **Explicit Trade-off Resolution: Cost vs. Latency vs. Capability**
-- *The Conflict:* You want the highly reasoning capabilities of GPT-4.1 or Claude 3.7 Sonnet, but their token costs are too high for volume processing. On the other hand, a self-hosted Llama 3.3 cluster is cheap and fast but may fail at complex structured reasoning tasks.
+- *The Conflict:* You want the highly reasoning capabilities of GPT-5.5 or Claude Opus 4.8, but their token costs are too high for volume processing. On the other hand, a self-hosted Llama 4 cluster is cheap and fast but may fail at complex structured reasoning tasks.
 - *The Resolution:* We execute **Intent-Based Semantic Routing**. The gateway (implemented via LiteLLM Proxy or an equivalent) evaluates the complexity of the request payload *before* routing.
-  - Standard tasks (e.g., summarization, simple classification) are routed to our self-hosted Llama 3.3 cluster or a cost-efficient inference provider like Groq or Together AI.
-  - Complex reasoning tasks (e.g., multi-step analysis, complex code generation) are routed to Claude 3.7 Sonnet or GPT-4.1.
+  - Standard tasks (e.g., summarization, simple classification) are routed to our self-hosted Llama 4 cluster or a cost-efficient inference provider like Groq or Together AI.
+  - Complex reasoning tasks (e.g., multi-step analysis, complex code generation) are routed to Claude Opus 4.8 or GPT-5.5.
   - If a serverless endpoint fails or triggers a rate limit, the gateway automatically falls back to an equivalent open model hosted on our dedicated backup cluster, maintaining absolute reliability.
 
 ### 5. Hands-On Project / Exercise
@@ -158,7 +158,7 @@ async def routed_chat_endpoint(payload: dict):
 ### 9. Common Pitfalls & Misconceptions
 
 - **Misconception: "Model outputs are identical across providers."**
-  **Reality:** Even if models share similar parameters (e.g., Llama 3.3 served on Groq vs. self-hosted on vLLM or SGLang), different serving engines, system prompts, or floating-point precision levels will result in different token outputs. Your validation tests must verify that your parsing logic is robust enough to handle these slight semantic variations.
+  **Reality:** Even if models share similar parameters (e.g., Llama 4 served on Groq vs. self-hosted on vLLM or SGLang), different serving engines, system prompts, or floating-point precision levels will result in different token outputs. Your validation tests must verify that your parsing logic is robust enough to handle these slight semantic variations.
 - **Pitfall: Fast Failovers without Timeout Control.**
   If your primary endpoint hangs instead of failing, and you don't have a strict connection timeout (e.g., 5.0 seconds), the gateway will wait indefinitely. This ruins the user experience. Always set strict timeouts before executing fallbacks.
 

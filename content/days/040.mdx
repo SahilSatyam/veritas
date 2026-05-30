@@ -29,8 +29,8 @@ Fine-tuning allows you to distill the capabilities of a large model into a small
 - _New Facts (Stock Prices, News)_ $\to$ **RAG**. (Fine-tuning is too slow to keep up).
 - _New Behavior (JSON formatting, Medical tone, SQL generation)_ $\to$ **Fine-Tuning**. (RAG is too fragile).
 
-- **PEFT (Parameter-Efficient Fine-Tuning)**: Instead of retraining the whole brain (70B params), we train a tiny "adapter" layer (LoRA) on top of it. This costs $5 instead of $50,000.
-- **Teacher-Student Distillation**: Use GPT-4 to generate perfect examples, then use those examples to train a small Llama-3-8B to do the same thing.
+- **PEFT (Parameter-Efficient Fine-Tuning)**: Instead of retraining the whole brain (70B+ params), we train a tiny "adapter" layer (LoRA) on top of it. This costs $5 instead of $50,000.
+- **Teacher-Student Distillation**: Use GPT-5.5 or Claude Opus 4.8 to generate perfect examples, then use those examples to train a small Llama 4 Scout or Qwen 3.5 to do the same thing.
 
 ### 3. Theoretical Foundations
 
@@ -59,7 +59,7 @@ When should you switch from RAG/Prompting to Fine-Tuning?
 
 **The Stack**:
 
-- **Base Model**: Llama-3-8B or Mistral-7B (The Engine).
+- **Base Model**: Llama 4 Scout, Qwen 3.5-7B, or Mistral Small 4 (The Engine).
 - **Dataset**: 500-1,000 high-quality input-output pairs (The Fuel).
 - **Library**: `Unsloth` (fastest) or `HuggingFace PEFT`.
 

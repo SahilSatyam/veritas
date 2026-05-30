@@ -144,7 +144,7 @@ for i, c in enumerate(rec_chunks):
 
 - **Copyright & Fair Use:** When you chunk a textbook and store it in a vector DB, are you creating a derivative work? In 2026, legal frameworks are stricter. Ensure you have the "Right to Process" the documents you ingest.
 - **PDF Parsing is Hell:** 80% of your engineering time will be spent on PDF extraction (handling multi-column layouts, tables, and headers). "Chat with PDF" is easy to demo, hard to productionize.
-- _Tip:_ Use vision-language models (like GPT-4o-vision) to parse PDFs to Markdown _before_ chunking, rather than text-only libraries like `pypdf` that garble layout.
+- _Tip:_ Use vision-language models (like GPT-5.5 Vision or Gemini 3.1 Pro) to parse PDFs to Markdown _before_ chunking, rather than text-only libraries like `pypdf` that garble layout.
 
 ### 7. Common Pitfalls
 

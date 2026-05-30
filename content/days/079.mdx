@@ -56,18 +56,18 @@ If your expected token volume $V \ll V_{break\_even}$, self-hosting is financial
 A production-grade organization follows a strict, escalating decision path:
 
 1. **Phase 1: Buy (SaaS API + Prompt Engineering / RAG):** Always start here. Use frontier APIs (OpenAI, Anthropic, Google) to validate Product-Market Fit. Validate the UX. Prove that the feature actually generates business value.
-2. **Phase 2: Fine-Tune (API-based or PEFT):** If the baseline API struggles with your specific domain syntax (e.g., esoteric legal formatting or proprietary code languages), utilize managed APIs like **OpenAI's Fine-Tuning API** (now supporting frontier models like **GPT-4o**), or high-performance third-party fine-tuning and inference platforms like **Together AI** or **Fireworks AI** to train and serve LoRA adapters efficiently without abandoning managed scaling infrastructure.
-3. **Phase 3: Self-Host (Open-Weights on Cloud Compute):** Escalate to self-hosting a model (e.g., vLLM serving Llama-3 on AWS SageMaker) _only_ when token volume crosses the mathematical break-even point, or if data privacy regulations explicitly prohibit routing data to third-party sub-processors.
+2. **Phase 2: Fine-Tune (API-based or PEFT):** If the baseline API struggles with your specific domain syntax (e.g., esoteric legal formatting or proprietary code languages), utilize managed APIs like **OpenAI's Fine-Tuning API** (now supporting frontier models like **GPT-5.5**), or high-performance third-party fine-tuning and inference platforms like **Together AI** or **Fireworks AI** to train and serve LoRA adapters efficiently without abandoning managed scaling infrastructure.
+3. **Phase 3: Self-Host (Open-Weights on Cloud Compute):** Escalate to self-hosting a model (e.g., vLLM serving Llama 4 on AWS SageMaker) _only_ when token volume crosses the mathematical break-even point, or if data privacy regulations explicitly prohibit routing data to third-party sub-processors.
 4. **Phase 4: Build (Pre-training from Scratch):** Almost never. Unless your business model is selling foundation models, or you possess massive multimodal data fundamentally absent from public training sets, do not pre-train.
 
 ### 5. Hands-On Project / Exercise
 
-**Constraint:** Create a deterministic TCO model comparing the 3-year cost of a managed "SaaS API" vs. "Self-Hosted Llama-3 on AWS". The model must explicitly identify the token volume where self-hosting becomes cheaper.
+**Constraint:** Create a deterministic TCO model comparing the 3-year cost of a managed "SaaS API" vs. "Self-Hosted Llama 4 on AWS". The model must explicitly identify the token volume where self-hosting becomes cheaper.
 
 **Architecture (The Math):**
 
-- **SaaS API (e.g., GPT-4o-mini class):** Blended cost of $0.50 per 1 Million tokens. Labor cost: $0 (Managed).
-- **Self-Hosted (Llama-3 8B via AWS):** Requires 1x `g5.2xlarge` instance (1 A10G GPU) for continuous availability. Cost: ~$1.21/hour = ~$870/month.
+- **SaaS API (e.g., GPT-5.4-mini class):** Blended cost of $0.50 per 1 Million tokens. Labor cost: $0 (Managed).
+- **Self-Hosted (Llama-4 Scout via AWS):** Requires 1x `g5.12xlarge` instance (4 A10G GPUs) for continuous availability. Cost: ~$5.67/hour = ~$4,100/month.
 - **Invisible Labor:** Maintaining this cluster (updates, scaling, monitoring) takes a conservative 10 hours/month of a Senior MLOps Engineer's time at $150/hr = $1,500/month.
 - **Break-even calculation:** $870 (Compute) + $1,500 (Labor) = $2,370/month fixed cost.
 - **Result:** $2,370 / $0.0000005 (cost per token) = **4.74 Billion tokens per month.**

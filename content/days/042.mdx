@@ -18,9 +18,9 @@ In traditional software, if a new feature fails, you roll back. In AI Engineerin
 Synthetic test sets (Day 41) are necessary but insufficient. They represent the world as you _imagine_ it, not as it _is_. Production traffic contains noise, malice, and edge cases that no "Golden Dataset" can fully capture.
 
 **The Failure Mode: Big Bang Failures**
-Imagine you upgrade from `gpt-3.5-turbo` to a fine-tuned Llama 3.3 model to save costs. The Llama model passed all your unit tests. You flip the switch. Immediately, users start complaining that the chatbot is refusing to answer benign questions because the fine-tuning data was too safety-heavy. You have to roll back, but you've already eroded user trust.
+Imagine you upgrade from `gpt-3.5-turbo` to a fine-tuned Llama 4 model to save costs. The Llama model passed all your unit tests. You flip the switch. Immediately, users start complaining that the chatbot is refusing to answer benign questions because the fine-tuning data was too safety-heavy. You have to roll back, but you've already eroded user trust.
 
-Shadow deployment allows you to run that Llama 3.3 model alongside GPT-3.5 for a week. You would have seen the refusal spike in the logs _before_ a single user was affected.
+Shadow deployment allows you to run that Llama 4 model alongside GPT-5.5-instant for a week. You would have seen the refusal spike in the logs _before_ a single user was affected.
 
 ### 2. Core Concepts & Mental Models
 

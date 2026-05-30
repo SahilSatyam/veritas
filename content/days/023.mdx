@@ -27,7 +27,7 @@ Standard Zero-Shot prompting fails on arithmetic, symbolic logic, and scheduling
 CoT transforms a mapping problem ($X \rightarrow Y$) into a sequential derivation problem ($X \rightarrow z_1 \rightarrow z_2 \rightarrow Y$).
 By forcing the model to output intermediate steps, you provide it with a "scratchpad." The model conditions its final answer on its own generated reasoning, significantly increasing logical consistency.
 
-> **Note:** Many frontier models (GPT-4o, Claude 3.7 Sonnet, Gemini 2.5 Pro) now perform internal chain-of-thought automatically without explicit prompting. However, _explicit_ CoT prompting via XML tags remains best practice for auditable, controllable reasoning in production systems.
+> **Note:** Many frontier models (GPT-5.5, Claude Opus 4.8, Gemini 3.1 Pro) now perform internal chain-of-thought automatically without explicit prompting. However, _explicit_ CoT prompting via XML tags remains best practice for auditable, controllable reasoning in production systems.
 
 #### ReAct (Reasoning + Acting)
 
@@ -41,7 +41,7 @@ While CoT is internal thinking, ReAct connects thinking to external tools.
 
 #### Extended Thinking (Inference-Time Compute Scaling)
 
-A third paradigm, pioneered by OpenAI's o1/o3/o4-mini series and Anthropic's Claude 3.7 Sonnet with extended thinking mode, scales reasoning by allocating additional **inference-time compute** rather than relying on prompt structure.
+A third paradigm, pioneered by OpenAI's o1/o3/o4-mini series and Anthropic's Claude Opus with extended thinking mode, scales reasoning by allocating additional **inference-time compute** rather than relying on prompt structure.
 
 - The model reasons internally for seconds or minutes before producing output.
 - You do not craft a CoT prompt — you set a "thinking budget" (tokens or seconds) and the model self-organizes its reasoning.

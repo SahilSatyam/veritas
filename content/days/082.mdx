@@ -52,20 +52,20 @@ _The Resolution:_ We explicitly and intentionally destroy the Student model's ab
 
 The production pipeline looks like this:
 
-1. **Prompt Engineering (The Blueprint):** Design a highly rigorous prompt for GPT-4o to perform the exact classification/extraction task you need.
-2. **Synthetic Generation (The Factory):** Use GPT-4o to generate 50,000 diverse, domain-specific text samples, alongside its predicted labels and confidence scores (Soft Targets). For reasoning-heavy tasks, consider using a thinking model (o3, o4-mini) as the teacher so the student learns chain-of-thought traces—the approach that made DeepSeek-R1's distilled variants so capable.
+1. **Prompt Engineering (The Blueprint):** Design a highly rigorous prompt for GPT-5.5 to perform the exact classification/extraction task you need.
+2. **Synthetic Generation (The Factory):** Use GPT-5.5 to generate 50,000 diverse, domain-specific text samples, alongside its predicted labels and confidence scores (Soft Targets). For reasoning-heavy tasks, consider using a thinking model (GPT-5.5 Thinking, o4-mini) as the teacher so the student learns chain-of-thought traces—the approach that made DeepSeek-R1's distilled variants so capable.
 3. **Distillation Training:** Fine-tune a `DeBERTa-v3-small`, `DistilBERT`, or a small-scale model like Phi-4-mini or a quantized Gemma 3 variant using KL Divergence loss against the Teacher's soft targets.
 4. **Edge Deployment:** Host the Student model internally via ONNX runtime or TensorRT, reducing latency from 800ms to 8ms.
 
 ### 5. Hands-On Project / Exercise
 
-**Constraint:** Build an automated financial sentiment analysis pipeline that matches GPT-4o but runs locally on CPU.
+**Constraint:** Build an automated financial sentiment analysis pipeline that matches GPT-5.5 but runs locally on CPU.
 
-1. **Data Generation:** Write a script utilizing the GPT-4o API to generate 10,000 synthetic sentences of financial news (e.g., earnings reports, market rumors, executive changes). Ask GPT-4o to classify each as `Bullish`, `Bearish`, or `Neutral`, and output the logprobs (or a formatted JSON of confidence scores).
+1. **Data Generation:** Write a script utilizing the GPT-5.5 API to generate 10,000 synthetic sentences of financial news (e.g., earnings reports, market rumors, executive changes). Ask GPT-5.5 to classify each as `Bullish`, `Bearish`, or `Neutral`, and output the logprobs (or a formatted JSON of confidence scores).
 2. **Student Initialization:** Load a pre-trained `distilbert-base-uncased` from Hugging Face.
-3. **Custom Loss Loop:** Implement a PyTorch training loop where the loss function combines standard Cross-Entropy (against the hard label) and KL Divergence (against GPT-4o's soft probabilities).
-4. **Audit & Verification:** Run a held-out test set of 1,000 human-verified financial headlines through both the GPT-4o API and your DistilBERT model.
-5. **Success Criteria:** Prove via telemetry logs that the DistilBERT model achieves $>95\%$ of GPT-4o's F1-score, while demonstrating a $1000\times$ reduction in cost-per-inference.
+3. **Custom Loss Loop:** Implement a PyTorch training loop where the loss function combines standard Cross-Entropy (against the hard label) and KL Divergence (against GPT-5.5's soft probabilities).
+4. **Audit & Verification:** Run a held-out test set of 1,000 human-verified financial headlines through both the GPT-5.5 API and your DistilBERT model.
+5. **Success Criteria:** Prove via telemetry logs that the DistilBERT model achieves $>95\%$ of GPT-5.5's F1-score, while demonstrating a $1000\times$ reduction in cost-per-inference.
 
 ### 6. Ethical, Security & Safety Considerations
 

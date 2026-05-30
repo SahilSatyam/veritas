@@ -194,7 +194,7 @@ If we use this probe as a reward model in training (e.g., "penalize the model if
 ### 7. Business & Strategic Implications
 
 1. **Liability Shield:** In regulated advice (financial/medical), a "Truth Probe" log serves as evidence that the system's internal logic was sound, even if the generation layer faltered (or vice versa).
-2. **Evaluating Vendor Models:** You cannot probe closed APIs (GPT-4o, Gemini 2.5 Pro) deeply. This is a strategic argument for **Open Weights** models (Llama 3.3, Mistral, Qwen2.5) in high-compliance sectors. If you can't probe the weights, you can't verify the reasoning.
+2. **Evaluating Vendor Models:** You cannot probe closed APIs (GPT-5.5, Gemini 3.1 Pro) deeply. This is a strategic argument for **Open Weights** models (Llama 4, Mistral, Qwen 3.5) in high-compliance sectors. If you can't probe the weights, you can't verify the reasoning.
 3. **Hallucination Firewall:** Before showing a response to a user, run the probe. If `Confidence(Text) > 90%` but `Probe(Truth) < 50%`, block the response.
 
 ### 8. Common Pitfalls & Misconceptions

@@ -33,7 +33,7 @@ In production, financial limits cannot be managed via asynchronous billing dashb
 To manage AI FinOps effectively, engineering leadership must adopt the following mental models:
 
 - **Token as Currency:** Tokens are not just compute units; they are fractional cents. Every prompt injection and context window expansion is a financial transaction.
-- **Model Cascading:** The practice of attempting a task with a smaller, cheaper, and faster model first (e.g., a Llama 3.3 or Mistral Small 3 class model), and only escalating to a massive frontier model if the output fails a deterministic quality check or if the query complexity demands it.
+- **Model Cascading:** The practice of attempting a task with a smaller, cheaper, and faster model first (e.g., a Llama 4 Scout or Mistral Small 4 class model), and only escalating to a massive frontier model if the output fails a deterministic quality check or if the query complexity demands it.
 - **Contextual Budgets:** A budget is not a static database value; it is a live state object passed directly into the execution context of the agent graph, dynamically restricting its operational capabilities as the budget depletes.
 - **AI Gateway Layer:** Rather than building a bespoke router from scratch, production teams standardize on an AI gateway. **LiteLLM Proxy** is the open-source standard—it unifies 100+ model APIs behind a single OpenAI-compatible interface, provides per-key budget caps, and emits per-request cost logs. **OpenRouter** is the managed equivalent, offering real-time cost-based routing across frontier and open-weight models via a single API endpoint.
 
@@ -64,8 +64,8 @@ A production AI FinOps pipeline requires intercepting every LLM call at the orch
 
 - **State:** A dictionary containing `user_id`, `prompt`, `monthly_budget_usd`, and `current_spend_usd`.
 - **Router Logic:** The `ModelRouter` calculates the remaining percentage.
-  - If $> 10\%$, it routes the request to a premium model (`gpt-4o-class` or `claude-3.7-sonnet-class`).
-  - If $\le 10\%$, it automatically overwrites the target to an economy model (`llama-3.3-70b-class` or `mistral-small-3-class`), and emits an audit log: `{"event": "Quality Downgrade", "user_id": 123, "reason": "Budget < 10%"}`.
+  - If $> 10\%$, it routes the request to a premium model (`gpt-5.5-class` or `claude-opus-4.8-class`).
+  - If $\le 10\%$, it automatically overwrites the target to an economy model (`llama-4-scout-class` or `mistral-small-4-class`), and emits an audit log: `{"event": "Quality Downgrade", "user_id": 123, "reason": "Budget < 10%"}`.
 
 ### 6. Ethical, Security & Safety Considerations
 

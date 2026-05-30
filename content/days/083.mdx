@@ -50,7 +50,7 @@ _The Resolution:_ We resolve this by decoupling reasoning from formatting using 
 **Constraint:** Build a structured extractor that pulls data from a messy PDF and strictly enforces a complex JSON schema using FSM-guided decoding, achieving 100% syntax validity across 50 runs.
 
 1. **Schema Definition:** Define a complex Pydantic model for a medical or legal document extraction. It must include an Enum, a strict date format (using Regex), and a nested list of objects.
-2. **Model Initialization:** Load an open-weight model (e.g., `Meta-Llama-3-8B-Instruct`) locally using the `outlines` library.
+2. **Model Initialization:** Load an open-weight model (e.g., `Llama-4-Scout-Instruct`) locally using the `outlines` library.
 3. **FSM Compilation:** Use `outlines.models.text_completion` and pass your Pydantic schema to compile the FSM.
 4. **The Extraction Loop:** Pass 50 distinct, messy, OCR-scraped text chunks through the model.
 5. **Audit & Verification:** Pipe the 50 outputs directly into `Model.model_validate_json()`. If a single `ValidationError` is thrown, the architecture has failed. _Success is exactly 0 parsing errors across all 50 runs, proving deterministic control._
@@ -93,7 +93,7 @@ class ThreatIntelligence(BaseModel):
 
 # 2. Load model and compile the FSM via Outlines
 # In production, this runs on vLLM or a similar high-throughput engine
-model = outlines.models.transformers("meta-llama/Meta-Llama-3-8B-Instruct")
+model = outlines.models.transformers("meta-llama/Llama-4-Scout-Instruct")
 
 # The generator compiles the Pydantic schema into a Regex, then into a DFA
 generator = outlines.generate.json(model, ThreatIntelligence)

@@ -176,7 +176,7 @@ async def execute_enterprise_pipeline(
         cost_multiplier = 10
     else:
         # Route to fast, self-hosted, highly optimized vLLM node (Day 093)
-        selected_route = "vLLM-Llama-3-8B-AWQ"
+        selected_route = "vLLM-Llama-4-Scout-AWQ"
         cost_multiplier = 1
         
     print(f"[ECOSYSTEM] Step 3: Dynamic routing complete. Selected engine: {selected_route}")

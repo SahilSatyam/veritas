@@ -5,13 +5,13 @@ lens: "Privacy"
 domain: "LLMs"
 day: "048"
 status: "locked"
-tags: ["Llama 3.3", "Privacy", "Quantization", "Ollama", "On-Prem"]
+tags: ["Llama 4", "Privacy", "Quantization", "Ollama", "On-Prem"]
 date: "2026-02-24"
 ---
 
 ### Abstract
 
-For many industries—defense, healthcare, legal, and finance—the "API Economy" is a non-starter. Sending a patient's medical history or a client's merger strategy to a public cloud inference endpoint (even one with "Enterprise" guarantees) constitutes an unacceptable risk or a direct violation of data sovereignty laws (GDPR, HIPAA, ITAR). The solution is **Local Inference**: bringing the model to the data, rather than sending the data to the model. This post explores the engineering reality of running state-of-the-art open-weights models (like Llama 3.3, Phi-4, Gemma 3, or Qwen 2.5) on your own infrastructure, trading raw intelligence for absolute control.
+For many industries—defense, healthcare, legal, and finance—the "API Economy" is a non-starter. Sending a patient's medical history or a client's merger strategy to a public cloud inference endpoint (even one with "Enterprise" guarantees) constitutes an unacceptable risk or a direct violation of data sovereignty laws (GDPR, HIPAA, ITAR). The solution is **Local Inference**: bringing the model to the data, rather than sending the data to the model. This post explores the engineering reality of running state-of-the-art open-weights models (like Llama 4 Scout/Maverick, Qwen 3.5, Mistral Small 4, or DeepSeek V4) on your own infrastructure, trading raw intelligence for absolute control.
 
 ### 1. Why This Topic Matters
 
@@ -28,8 +28,8 @@ The convenience of `import openai` masks a massive compliance liability. When yo
 
 **The Intelligence vs. Control Trade-off**
 
-- **Public Cloud (GPT-4o/Claude 3.7):** Massive parameter counts (Trillions), high reasoning capability, zero privacy control.
-- **Local (Llama 3.3, Phi-4, Gemma 3, or Qwen 2.5):** Smaller but highly optimized parameter counts (3B to 72B), lower general reasoning but easily adaptable, 100% privacy control.
+- **Public Cloud (GPT-5.5/Claude Opus 4.8):** Massive parameter counts (Trillions), high reasoning capability, zero privacy control.
+- **Local (Llama 4 Scout/Maverick, Qwen 3.5, Mistral Small 4, or DeepSeek V4):** Highly optimized MoE architectures (17B-49B active parameters), competitive reasoning on many tasks, 100% privacy control.
 
 **Quantization (The Compression Key)**
 To run a model locally, it must fit in your GPU's VRAM.
@@ -43,7 +43,9 @@ To run a model locally, it must fit in your GPU's VRAM.
 - **Llama.cpp:** The C++ backend that made CPU/Apple Silicon inference possible.
 - **Ollama:** The standard "Docker for LLMs" that wraps llama.cpp in a developer-friendly API.
 - **Apple MLX:** Apple's native machine learning framework designed specifically for Apple Silicon, allowing unified memory LLM execution at extreme speeds.
-- **vLLM / SGLang:** High-throughput serving engines for production clusters with advanced paging and speculative execution.
+- **vLLM / SGLang:** High-throughput serving engines for production clusters with advanced paging, speculative execution, and RadixAttention.
+
+> **Note on EU Availability:** Llama 4 is not available in the EU due to Meta's licensing restrictions. European teams should default to **Mistral Small 4** (Apache 2.0) or **Qwen 3.5** (Apache 2.0) for local deployments.
 
 ### 3. Theoretical Foundations
 
@@ -60,7 +62,8 @@ Instead of calling an external API, your application calls a container running o
 
 **Hardware Requirements (Rule of Thumb)**
 
-- **7B / 8B Model (Int4):** Needs ~6GB VRAM (Runs on most modern laptops).
+- **8B-17B Model (Int4):** Needs ~6-10GB VRAM (Runs on most modern laptops).
+- **Llama 4 Scout (17B active, MoE):** Needs ~55GB VRAM at 4-bit (multi-GPU or server-class hardware).
 - **70B Model (Int4):** Needs ~40GB VRAM (Requires 2x RTX 3090/4090 or A6000).
 
 ### 5. Hands-On Project / Exercise
@@ -228,9 +231,9 @@ Just because a model is offline doesn't mean it's safe from prompt injection. If
 
 ### 8. Common Pitfalls & Misconceptions
 
-- **"Local is too stupid":** This was true in 2022. With Llama 3.3 and Mistral, an 8B parameter model beats GPT-3.5 on many benchmarks. For summarization, classification, and extraction, they are often _better_ because you can fine-tune them on your specific data.
+- **"Local is too stupid":** This was true in 2022. With Llama 4 Maverick, DeepSeek V4, and Qwen 3.5, open-weight MoE models now rival GPT-4o-class performance on many benchmarks. For summarization, classification, and extraction, they are often _better_ because you can fine-tune them on your specific data.
 - **VRAM OOM (Out of Memory):** The most common error.
-- _Fix:_ Use `GGUF` quantization (Q4_K_M or Q5_K_M). Never try to run full FP16 weights on consumer cards.
+- _Fix:_ Use `GGUF` quantization (Q4_K_M or Q5_K_M). Never try to run full FP16 weights on consumer cards. For MoE models like Llama 4, consider offloading inactive experts to CPU RAM.
 
 ### 9. Prerequisites & Next Steps
 
