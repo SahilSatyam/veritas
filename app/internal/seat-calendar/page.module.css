@@ -1,0 +1,854 @@
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.header {
+  margin-bottom: 2rem;
+}
+
+.header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.subtitle {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+/* Widgets */
+.widgets {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.widget {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+.widgetLabel {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.widgetValue {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.widgetMeta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Controls */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.viewTabs {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tab {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all var(--transition-fast);
+}
+
+.tab:hover {
+  background: var(--bg-secondary);
+}
+
+.tabActive {
+  background: var(--accent-color);
+  color: var(--text-inverse);
+}
+
+.navControls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.navBtn {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all var(--transition-fast);
+}
+
+.navBtn:hover {
+  background: var(--bg-secondary);
+}
+
+.navTitle {
+  font-weight: 600;
+  font-size: 1rem;
+  min-width: 180px;
+  text-align: center;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-left: auto;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.toggle input {
+  cursor: pointer;
+}
+
+.exportBtn {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all var(--transition-fast);
+}
+
+.exportBtn:hover {
+  background: var(--accent-light);
+  border-color: var(--accent-color);
+}
+
+/* Month Grid */
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 2rem;
+}
+
+.dayHeader {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  padding: 0.5rem 0;
+}
+
+.dayCell {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: transparent;
+  position: relative;
+  min-height: 48px;
+}
+
+.dayCellActive {
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.dayCellActive:hover {
+  background: var(--bg-secondary);
+}
+
+.dayNumber {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.seatIndicator {
+  font-size: 0.6rem;
+  position: absolute;
+  bottom: 4px;
+}
+
+/* Seat number badge — month view */
+.seatBadge {
+  font-size: 0.55rem;
+  font-weight: 700;
+  background: rgba(34, 197, 94, 0.2);
+  color: #15803d;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  border-radius: 4px;
+  padding: 0px 3px;
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  line-height: 1.4;
+  font-family: var(--font-mono);
+}
+
+/* Seat number badge — week view */
+.seatBadgeWeek {
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(34, 197, 94, 0.15);
+  color: #15803d;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  border-radius: 5px;
+  padding: 1px 6px;
+  margin-top: 0.35rem;
+  font-family: var(--font-mono);
+}
+
+/* Seat number badge — inline (agenda, detail) */
+.seatBadgeInline {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: rgba(34, 197, 94, 0.15);
+  color: #15803d;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  border-radius: 5px;
+  padding: 1px 6px;
+  margin-left: 0.5rem;
+  font-family: var(--font-mono);
+  vertical-align: middle;
+}
+
+@media (prefers-color-scheme: dark) {
+  .seatBadge,
+  .seatBadgeWeek,
+  .seatBadgeInline {
+    background: rgba(34, 197, 94, 0.15);
+    color: #86efac;
+    border-color: rgba(34, 197, 94, 0.3);
+  }
+}
+
+/* Seat day highlight */
+.seatDay {
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.seatDay:hover {
+  background: rgba(34, 197, 94, 0.2);
+}
+
+/* Today highlight */
+.today {
+  border-color: var(--accent-color) !important;
+  box-shadow: 0 0 0 1px var(--accent-color);
+}
+
+/* Selected */
+.selected {
+  background: var(--accent-light) !important;
+  border-color: var(--accent-color);
+}
+
+/* Week coloring */
+.week1 {
+  border-left: 3px solid rgba(59, 130, 246, 0.4);
+}
+
+.week2 {
+  border-left: 3px solid rgba(168, 85, 247, 0.4);
+}
+
+/* Week View */
+.weekView {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+  margin-bottom: 2rem;
+}
+
+.weekDay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 0.5rem;
+  border-radius: 12px;
+  border: 2px solid var(--border-subtle);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.weekDay:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.weekDayLabel {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.weekDayDate {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.weekDayStatus {
+  font-size: 1.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.weekDayMeta {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+/* Agenda View */
+.agendaView {
+  margin-bottom: 2rem;
+}
+
+.agendaView h3 {
+  margin-bottom: 1rem;
+}
+
+.agendaList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.agendaItem {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  transition: all var(--transition-fast);
+}
+
+.agendaItem:hover {
+  background: var(--bg-secondary);
+}
+
+.agendaItem.today {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 1px var(--accent-color);
+}
+
+.agendaDate {
+  font-weight: 600;
+  min-width: 160px;
+}
+
+.agendaMeta {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  min-width: 120px;
+}
+
+.agendaStatus {
+  margin-left: auto;
+  font-size: 0.9rem;
+}
+
+/* Detail Panel */
+.detail {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.detail h3 {
+  margin-bottom: 0.75rem;
+  margin-top: 0;
+}
+
+.detail p {
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.detailClose {
+  position: absolute;
+  top: 0.75rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+.detailClose:hover {
+  color: var(--text-primary);
+}
+
+/* Legend */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.legendSwatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.seatSwatch {
+  background: rgba(34, 197, 94, 0.3);
+  border: 1px solid rgba(34, 197, 94, 0.6);
+}
+
+.todaySwatch {
+  background: var(--bg-card);
+  border: 2px solid var(--accent-color);
+}
+
+.week1Swatch {
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.5);
+}
+
+.week2Swatch {
+  background: rgba(168, 85, 247, 0.2);
+  border: 1px solid rgba(168, 85, 247, 0.5);
+}
+
+/* Page-level Tabs (My Schedule / Team) */
+.pageTabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 2rem;
+  border-bottom: 2px solid var(--border-subtle);
+}
+
+.pageTab {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all var(--transition-fast);
+}
+
+.pageTab:hover {
+  color: var(--text-primary);
+}
+
+.pageTabActive {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent-color);
+}
+
+.scheduleLabel {
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+}
+
+/* Team Section */
+.teamHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+
+.teamTitle {
+  font-size: 1.5rem;
+  margin: 0;
+}
+
+.addBtn {
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--accent-color);
+  border-radius: 8px;
+  background: var(--accent-light);
+  color: var(--accent-color);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.addBtn:hover {
+  background: var(--accent-color);
+  color: var(--text-inverse);
+}
+
+.emptyState {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  padding: 2rem;
+  text-align: center;
+  border: 1px dashed var(--border-subtle);
+  border-radius: 12px;
+}
+
+.memberList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.memberCard {
+  display: flex;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.memberCard:hover {
+  border-color: var(--accent-color);
+}
+
+.memberCardActive {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 1px var(--accent-color);
+}
+
+.memberCardBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 1rem 1.25rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.memberName {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.memberMeta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 0.2rem;
+}
+
+.memberActions {
+  display: flex;
+  gap: 0.25rem;
+  padding-right: 0.75rem;
+}
+
+.memberActionBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0.4rem;
+  border-radius: 6px;
+  transition: background var(--transition-fast);
+}
+
+.memberActionBtn:hover {
+  background: var(--bg-secondary);
+}
+
+/* Form */
+.formCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.formCard h3 {
+  margin-top: 0;
+  margin-bottom: 1.25rem;
+}
+
+.formRow {
+  margin-bottom: 1rem;
+}
+
+.formLabel {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.formInput {
+  width: 100%;
+  max-width: 320px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.formInput:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+.weeksConfig {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.weekRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.weekRowLabel {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 55px;
+}
+
+.dayToggles {
+  display: flex;
+  gap: 4px;
+}
+
+.dayToggle {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dayToggle:hover {
+  border-color: var(--accent-color);
+}
+
+.dayToggleActive {
+  background: var(--accent-color);
+  color: var(--text-inverse);
+  border-color: var(--accent-color);
+}
+
+.formActions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.saveBtn {
+  padding: 0.5rem 1.25rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent-color);
+  color: var(--text-inverse);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.saveBtn:hover {
+  opacity: 0.9;
+}
+
+.cancelBtn {
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.cancelBtn:hover {
+  background: var(--bg-secondary);
+}
+
+.teamCalendar {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+
+  .header h1 {
+    font-size: 1.75rem;
+  }
+
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .navControls {
+    justify-content: center;
+  }
+
+  .actions {
+    justify-content: center;
+    margin-left: 0;
+  }
+
+  .navTitle {
+    min-width: auto;
+    font-size: 0.9rem;
+  }
+
+  .monthGrid {
+    gap: 2px;
+  }
+
+  .dayCell {
+    min-height: 40px;
+  }
+
+  .dayNumber {
+    font-size: 0.75rem;
+  }
+
+  .seatIndicator {
+    font-size: 0.5rem;
+  }
+
+  .weekView {
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+
+  .weekDay {
+    padding: 0.75rem 0.25rem;
+  }
+
+  .weekDayDate {
+    font-size: 1rem;
+  }
+
+  .agendaItem {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+
+  .agendaStatus {
+    margin-left: 0;
+  }
+
+  .pageTabs {
+    gap: 0;
+  }
+
+  .pageTab {
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .teamHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .weekRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dayToggles {
+    flex-wrap: wrap;
+  }
+
+  .memberCard {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .memberActions {
+    padding: 0.5rem 1rem;
+    justify-content: flex-end;
+  }
+}
